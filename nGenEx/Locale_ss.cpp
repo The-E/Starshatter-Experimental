@@ -12,6 +12,7 @@
 	3D Locale (Polygon) Object
 */
 
+#include <vector>
 #include "MemDebug.h"
 #include "Locale_ss.h"
 
@@ -19,7 +20,7 @@ void  Print(const char* fmt, ...);
 
 // +--------------------------------------------------------------------+
 
-static List<Locale>   locales;
+static std::vector<Locale>   locales;
 
 // +--------------------------------------------------------------------+
 
@@ -53,14 +54,19 @@ Locale::Locale(const char* l, const char* c, const char* v)
 		}
 	}
 
-	locales.append(this);
+	locales.push_back(*this);
 }
 
 // +--------------------------------------------------------------------+
 
 Locale::~Locale()
 {
-	locales.remove(this);
+	for (auto l_it = locales.begin(); l_it != locales.end(); ++l_it) {
+		if (*l_it == *this) {
+			locales.erase(l_it);
+			return;
+		}
+	}
 }
 
 // +--------------------------------------------------------------------+
@@ -124,24 +130,22 @@ Locale::ParseLocale(const char* str)
 Locale*
 Locale::CreateLocale(const char* l, const char* c, const char* v)
 {
-	ListIter<Locale> iter = locales;
-	while (++iter) {
-		Locale* loc = iter.value();
-		if (!_stricmp(l, loc->GetLanguage())) {
+	for (auto iter = locales.begin(); iter != locales.end(); ++iter) {
+		if (!_stricmp(l, iter->GetLanguage())) {
 			if (c && *c) {
-				if (!_stricmp(c, loc->GetCountry())) {
+				if (!_stricmp(c, iter->GetCountry())) {
 					if (v && *v) {
-						if (!_stricmp(v, loc->GetVariant())) {
-							return loc;
+						if (!_stricmp(v, iter->GetVariant())) {
+							return &(*iter);
 						}
 					}
 					else {
-						return loc;
+						return &(*iter);
 					}
 				}
 			}
 			else {
-				return loc;
+				return &(*iter);
 			}
 		}
 	}
@@ -161,7 +165,7 @@ Locale::CreateLocale(const char* l, const char* c, const char* v)
 
 // +--------------------------------------------------------------------+
 
-const List<Locale>& 
+const std::vector<Locale>& 
 Locale::GetAllLocales()
 {
 	return locales;

@@ -12,6 +12,7 @@
 	Window class
 */
 
+#include <vector>
 #include "MemDebug.h"
 #include "ActiveWindow.h"
 #include "EventDispatch.h"
@@ -73,8 +74,8 @@ ActiveWindow::~ActiveWindow()
 
 	screen->DelWindow(this);
 	Hide();
-	clients.destroy();
-	children.destroy();
+	clients.clear();
+	children.clear();
 
 	if (polys)  delete [] polys;
 	if (vset)   delete    vset;
@@ -90,16 +91,16 @@ ActiveWindow::Show()
 	if (dispatch)
 	dispatch->Register(this);
 
-	ListIter<View> v_iter = view_list;
-	while (++v_iter) {
-		View* view = v_iter.value();
-		view->OnShow();
+	auto v_iter = view_list.begin();
+	while (v_iter != view_list.end()) {
+		v_iter->OnShow();
+		++v_iter;
 	}
 
-	ListIter<ActiveWindow> c_iter = children;
-	while (++c_iter) {
-		ActiveWindow* child = c_iter.value();
-		child->Show();
+	auto c_iter = children.begin();
+	while (c_iter != children.end()) {
+		c_iter->Show();
+		++c_iter;
 	}
 
 	shown = true;
@@ -116,16 +117,16 @@ ActiveWindow::Hide()
 		focus = false;
 	}
 
-	ListIter<View> v_iter = view_list;
-	while (++v_iter) {
-		View* view = v_iter.value();
-		view->OnHide();
+	auto v_iter = view_list.begin();
+	while (v_iter != view_list.end()) {
+		v_iter->OnHide();
+		++v_iter;
 	}
 
-	ListIter<ActiveWindow> c_iter = children;
-	while (++c_iter) {
-		ActiveWindow* child = c_iter.value();
-		child->Hide();
+	auto c_iter = children.begin();
+	while (c_iter != children.end()) {
+		c_iter->Hide();
+		++c_iter;
 	}
 
 	shown = false;
@@ -145,9 +146,11 @@ ActiveWindow::MoveTo(const Rect& r)
 	rect = r;
 	CalcGrid();
 
-	ListIter<View> v = view_list;
-	while (++v)
-	v->OnWindowMove();
+	auto v = view_list.begin();
+	while (v != view_list.end()) {
+		v->OnWindowMove();
+		++v;
+	}
 
 	if (layout)
 	layout->DoLayout(this);
@@ -159,7 +162,7 @@ void
 ActiveWindow::AddChild(ActiveWindow* child)
 {
 	if (child)
-	children.append(child);
+		children.push_back(*child);
 }
 
 // +--------------------------------------------------------------------+
@@ -174,10 +177,10 @@ ActiveWindow::DoLayout()
 // +--------------------------------------------------------------------+
 
 void
-ActiveWindow::UseLayout(const ArrayList& min_x,
-const ArrayList& min_y,
-const FloatList& weight_x,
-const FloatList& weight_y)
+ActiveWindow::UseLayout(const std::vector<DWORD>& min_x,
+const std::vector<DWORD>& min_y,
+const std::vector<float>& weight_x,
+const std::vector<float>& weight_y)
 {
 	if (!layout)
 	layout = new(__FILE__,__LINE__) Layout;
@@ -187,10 +190,10 @@ const FloatList& weight_y)
 }
 
 void
-ActiveWindow::UseLayout(const FloatList& min_x,
-const FloatList& min_y,
-const FloatList& weight_x,
-const FloatList& weight_y)
+ActiveWindow::UseLayout(const std::vector<float>& min_x,
+const std::vector<float>& min_y,
+const std::vector<float>& weight_x,
+const std::vector<float>& weight_y)
 {
 	if (!layout)
 	layout = new(__FILE__,__LINE__) Layout;
@@ -257,9 +260,8 @@ ActiveWindow::Draw()
 	}
 
 	if (enabled && view_list.size()) {
-		ListIter<View> v = view_list;
-		while (++v)
-		v->Refresh();
+		for( auto v = view_list.begin(); v != view_list.end(); ++v)
+			v->Refresh();
 	}
 
 	if (!transparent) {
@@ -273,10 +275,10 @@ ActiveWindow::Draw()
 	SetAlpha(old_alpha);
 
 	// update children windows:
-	ListIter<ActiveWindow> iter = children;
-	while (++iter) {
-		ActiveWindow* child = iter.value();
-		child->Draw();
+	auto iter = children.begin();
+	while (iter != children.end()) {
+		iter->Draw();
+		++iter;
 	}
 }
 
@@ -780,17 +782,19 @@ ActiveWindow::RegisterClient(int eid, ActiveWindow* client, PFVAWE callback)
 	AWMap* map = new(__FILE__,__LINE__) AWMap(eid, client, callback);
 
 	if (map != 0)
-	clients.append(map);
+		clients.push_back(*map);
 }
 
 void
 ActiveWindow::UnregisterClient(int eid, ActiveWindow* client)
 {
 	AWMap test(eid, client, 0);
-	int   index = clients.index(&test);
-
-	if (index >= 0)
-	delete clients.removeIndex(index);
+	for (auto c_iter = clients.begin(); c_iter != clients.end(); ++c_iter) {
+		if (*c_iter == test) {
+			clients.erase(c_iter);
+			return;
+		}
+	}
 }
 
 void
@@ -801,10 +805,11 @@ ActiveWindow::ClientEvent(int eid, int x, int y)
 	event.x      = x;
 	event.y      = y;
 
-	ListIter<AWMap> map = clients;
-	while (++map) {
+	auto map = clients.begin();
+	while (map != clients.end()) {
 		if (map->eid == eid)
-		map->func(map->client, &event);
+			map->func(map->client, &event);
+		++map;
 	}
 }   
 
@@ -967,16 +972,18 @@ ActiveWindow::IsFormActive() const
 ActiveWindow*
 ActiveWindow::FindChild(DWORD id)
 {
-	ListIter<ActiveWindow> iter = children;
-	while (++iter) {
-		ActiveWindow* w = iter.value();
+	size_t i = 0;
+	while (i < children.size()) {
+		ActiveWindow* w = &children[i];
 		if (w->GetID() == id)
-		return w;
+			return w;
 
 		ActiveWindow* w2 = w->FindChild(id);
 
 		if (w2)
-		return w2;
+			return w2;
+
+		++i;
 	}
 
 	return 0;
@@ -990,11 +997,12 @@ ActiveWindow::FindChild(int x, int y)
 {
 	ActiveWindow* mouse_tgt = 0;
 
-	ListIter<ActiveWindow> iter = children;
-	while (++iter) {
-		ActiveWindow* test = iter.value();
-		if (test->TargetRect().Contains(x,y))
-		mouse_tgt = test;
+	auto iter = children.begin();
+	while (iter != children.end()) {
+		ActiveWindow test = *iter;
+		if (iter->TargetRect().Contains(x,y))
+			mouse_tgt = &test;
+		++iter;
 	}
 
 	return mouse_tgt;

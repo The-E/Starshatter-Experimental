@@ -76,7 +76,7 @@ void
 MagicDoc::InitCommandStack()
 {
    nundo = 0;
-   commands.destroy();
+   commands.clear();
 }
 
 void
@@ -85,7 +85,7 @@ MagicDoc::Exec(Command* command)
    int nredo = commands.size() - nundo;
    
    while (nredo) {
-      delete commands.removeIndex(commands.size()-1);
+	   commands.pop_back();
       nredo--;
    }
 
@@ -93,11 +93,11 @@ MagicDoc::Exec(Command* command)
       nundo++;
    }
    else {
-      delete commands.removeIndex(0);
+	   commands.erase(commands.begin());
    }
 
    command->Do();
-   commands.append(command);
+   commands.push_back(*command);
 }
 
 int
@@ -116,7 +116,7 @@ const char*
 MagicDoc::GetUndoName() const
 {
    if (nundo > 0 && nundo <= commands.size())
-      return commands[nundo-1]->Name();
+      return commands[nundo-1].Name();
    else
       return "";
 }
@@ -125,7 +125,7 @@ const char*
 MagicDoc::GetRedoName() const
 {
    if (nundo >= 0 && nundo < commands.size())
-      return commands[nundo]->Name();
+      return commands[nundo].Name();
    else
       return "";
 }
@@ -134,14 +134,14 @@ void
 MagicDoc::Undo()
 {
    if (nundo > 0 && nundo <= commands.size())
-      commands[--nundo]->Undo();
+      commands[--nundo].Undo();
 }
 
 void
 MagicDoc::Redo()
 {
    if (nundo >= 0 && nundo < commands.size())
-      commands[nundo++]->Do();
+      commands[nundo++].Do();
 }
 
 // +--------------------------------------------------------------------+
@@ -251,8 +251,10 @@ MagicDoc::ImportFile(LPCTSTR path_name)
             Model* orig = solid->GetModel();
             Model* imported = s->GetModel();
 
-            orig->GetMaterials().append(imported->GetMaterials());
-            orig->GetSurfaces().append(imported->GetSurfaces());
+			for (auto matit = imported->GetMaterials().begin(); matit != imported->GetMaterials().end(); ++matit)
+				orig->GetMaterials().push_back(*matit);
+			for (auto surfit = imported->GetSurfaces().begin(); surfit != imported->GetSurfaces().end(); ++surfit)
+				orig->GetSurfaces().push_back(*surfit);
             orig->OptimizeMaterials();
 
             imported->GetMaterials().clear();
@@ -288,8 +290,10 @@ MagicDoc::ImportFile(LPCTSTR path_name)
             Model* orig = solid->GetModel();
             Model* imported = s->GetModel();
 
-            orig->GetMaterials().append(imported->GetMaterials());
-            orig->GetSurfaces().append(imported->GetSurfaces());
+            for (auto matit = imported->GetMaterials().begin(); matit != imported->GetMaterials().end(); ++matit)
+				orig->GetMaterials().push_back(*matit);
+			for (auto surfit = imported->GetSurfaces().begin(); surfit != imported->GetSurfaces().end(); ++surfit)
+				orig->GetSurfaces().push_back(*surfit);
             orig->OptimizeMaterials();
 
             imported->GetMaterials().clear();
@@ -351,8 +355,10 @@ MagicDoc::ImportFile(LPCTSTR path_name)
          Model* orig = solid->GetModel();
          Model* imported = s->GetModel();
 
-         orig->GetMaterials().append(imported->GetMaterials());
-         orig->GetSurfaces().append(imported->GetSurfaces());
+         for (auto matit = imported->GetMaterials().begin(); matit != imported->GetMaterials().end(); ++matit)
+			orig->GetMaterials().push_back(*matit);
+		 for (auto surfit = imported->GetSurfaces().begin(); surfit != imported->GetSurfaces().end(); ++surfit)
+			orig->GetSurfaces().push_back(*surfit);
          orig->OptimizeMaterials();
 
          imported->GetMaterials().clear();

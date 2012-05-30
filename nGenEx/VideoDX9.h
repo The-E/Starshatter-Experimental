@@ -15,6 +15,7 @@
 #ifndef VideoDX9_h
 #define VideoDX9_h
 
+#include <vector>
 #include "Video.h"
 #include "VideoSettings.h"
 #include "List.h"
@@ -89,7 +90,7 @@ public:
 	virtual bool   SetCamera(const Camera* cam);
 	virtual bool   SetEnvironment(Bitmap** faces);
 	virtual bool   SetAmbient(Color c);
-	virtual bool   SetLights(const List<Light>& lights);
+	virtual bool   SetLights(const std::vector<Light>& lights);
 	virtual bool   SetProjection(float fov, 
 	float znear=1.0f, 
 	float zfar=1.0e6f, 

@@ -15,6 +15,7 @@
 #ifndef FontMgr_h
 #define FontMgr_h
 
+#include <vector>
 #include "Types.h"
 #include "Color.h"
 #include "List.h"
@@ -43,7 +44,7 @@ public:
 	static Font*   Find(const char* name);
 
 private:
-	static List<FontItem> fonts;
+	static std::vector<FontItem> fonts;
 };
 
 #endif FontMgr_h

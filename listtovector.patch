@@ -1,0 +1,2733 @@
+Index: Magic2/Editor.cpp
+===================================================================
+--- Magic2/Editor.cpp	(revision 51)
++++ Magic2/Editor.cpp	(working copy)
+@@ -80,7 +80,7 @@
+ }
+ 
+ void
+-Editor::ApplyMaterial(Material* material, List<Poly>& polys,
++Editor::ApplyMaterial(Material* material, std::vector<Poly>& polys,
+                     int mapping, int axis, float scale_u, float scale_v,
+                     int flip, int mirror, int rotate)
+ {
+@@ -99,20 +99,19 @@
+       return;
+    }
+ 
+-   VertexSet*  vset = polys.first()->vertex_set;
++   VertexSet*  vset = polys.begin()->vertex_set;
+ 
+    Vec3*    loc   = vset->loc;
+    float    min_u = 100000.0f, max_u = -100000.0f;
+    float    min_v = 100000.0f, max_v = -100000.0f;
+ 
+-   ListIter<Poly> iter = polys;
++   auto iter = polys.begin();
+ 
+    // compute range and scale:
+    if (mapping == MAP_PLANAR) {
+-      while (++iter) {
+-         Poly* poly = iter.value();
+-         for (int i = 0; i < poly->nverts; i++) {
+-            int v = poly->verts[i];
++      while (iter != polys.end()) {
++         for (int i = 0; i < iter->nverts; i++) {
++            int v = iter->verts[i];
+             
+             float u0 = project_u(loc[v], axis);
+             float v0 = project_v(loc[v], axis);
+@@ -122,6 +121,7 @@
+             if (u0 > max_u) max_u = u0;
+             if (v0 > max_v) max_v = v0;
+          }
++		 ++iter;
+       }
+    }
+ 
+@@ -131,19 +131,17 @@
+    if (max_u != min_u) base_u = 1.0f / (max_u - min_u);
+    if (max_v != min_v) base_v = 1.0f / (max_v - min_v);
+ 
+-   iter.reset();
++   iter = polys.begin();
+ 
+    // assign texture id and coordinates:
+-   while (++iter) {
+-      Poly* poly = iter.value();
+-      
+-      poly->material = material;
++   while (iter != polys.end()) {
++      iter->material = material;
+ 
+       if (mapping == MAP_NONE)
+          continue;
+ 
+-      for (int i = 0; i < poly->nverts; i++) {
+-         int v = poly->verts[i];
++      for (int i = 0; i < iter->nverts; i++) {
++         int v = iter->verts[i];
+ 
+          // planar projection
+          if (mapping == MAP_PLANAR) {
+@@ -200,29 +198,29 @@
+             }
+          }
+       }
++	  ++iter;
+    }
+ 
+    Resegment();
+ }
+ 
+ void
+-Editor::ApplyMaterialCylindrical(Material* material, List<Poly>& polys,
++Editor::ApplyMaterialCylindrical(Material* material, std::vector<Poly>& polys,
+                     int axis, float scale_u, float scale_v,
+                     int flip, int mirror, int rotate)
+ {
+-   VertexSet*  vset = polys.first()->vertex_set;
++   VertexSet*  vset = polys.begin()->vertex_set;
+ 
+    Vec3*    loc   = vset->loc;
+    float    min_u = 100000.0f, max_u = -100000.0f;
+    float    min_v = 100000.0f, max_v = -100000.0f;
+ 
+-   ListIter<Poly> iter = polys;
++   auto iter = polys.begin();
+ 
+    // compute range and scale:
+-   while (++iter) {
+-      Poly* poly = iter.value();
+-      for (int i = 0; i < poly->nverts; i++) {
+-         int v = poly->verts[i];
++   while (iter != polys.end()) {
++      for (int i = 0; i < iter->nverts; i++) {
++         int v = iter->verts[i];
+          
+          float u0 = project_u_cylindrical(loc[v], axis);
+          float v0 = project_v_cylindrical(loc[v], axis);
+@@ -232,6 +230,7 @@
+          if (u0 > max_u) max_u = u0;
+          if (v0 > max_v) max_v = v0;
+       }
++	  ++iter;
+    }
+ 
+    float base_u = 0.0f;
+@@ -240,16 +239,14 @@
+    if (max_u != min_u) base_u = 1.0f / (max_u - min_u);
+    if (max_v != min_v) base_v = 1.0f / (max_v - min_v);
+ 
+-   iter.reset();
++   iter = polys.begin();
+ 
+    // assign texture id and coordinates:
+-   while (++iter) {
+-      Poly* poly = iter.value();
++   while (iter != polys.end()) {
++      iter->material = material;
+       
+-      poly->material = material;
+-      
+-      for (int i = 0; i < poly->nverts; i++) {
+-         int   v  = poly->verts[i];
++      for (int i = 0; i < iter->nverts; i++) {
++         int   v  = iter->verts[i];
+          float u0 = project_u_cylindrical(loc[v], axis);
+          float v0 = project_v_cylindrical(loc[v], axis);
+ 
+@@ -276,13 +273,14 @@
+                vset->tu[v] = (v0 - min_v) * scale_v * base_v;
+          }
+       }
++	  ++iter;
+    }
+ 
+    Resegment();
+ }
+ 
+ void
+-Editor::ApplyMaterialSpherical(Material* material, List<Poly>& polys,
++Editor::ApplyMaterialSpherical(Material* material, std::vector<Poly>& polys,
+                     int axis, float scale_u, float scale_v,
+                     int flip, int mirror, int rotate)
+ {
+@@ -308,25 +306,27 @@
+ Editor::Resegment()
+ {
+    if (model) {
+-      ListIter<Surface> iter = model->GetSurfaces();
+-      while (++iter) {
+-         Surface* surface = iter.value();
+-         Poly*    polys   = surface->GetPolys();
+-         int      npolys  = surface->NumPolys();
++      for (auto iter = model->GetSurfaces().begin(); iter != model->GetSurfaces().end(); ++iter) {
++         Poly*    polys   = iter->GetPolys();
++         int      npolys  = iter->NumPolys();
+ 
+          for (int n = 0; n < npolys; n++) {
+             Poly*     p = polys + n;
+             Material* m = p->material;
+-            int sortval = model->GetMaterials().index(m) + 1;
++			int sortval = 0;
++			for (auto mat_iter = model->GetMaterials().begin(); mat_iter != model->GetMaterials().end(); ++mat_iter) {
++				if (*m == *mat_iter)
++					sortval = (mat_iter - model->GetMaterials().begin()) + 1;
++			}
+ 
+             if (p->sortval != sortval)
+                p->sortval = sortval;
+          }
+ 
+          // destroy the old segments and video data:
+-         VideoPrivateData* video_data = surface->GetVideoPrivateData();
+-         surface->SetVideoPrivateData(0);
+-         surface->GetSegments().destroy();
++         VideoPrivateData* video_data = iter->GetVideoPrivateData();
++         iter->SetVideoPrivateData(0);
++         iter->GetSegments().clear();
+ 
+          delete video_data;
+ 
+@@ -351,7 +351,7 @@
+                segment->polys    = polys + n;
+                segment->material = segment->polys->material;
+ 
+-               surface->GetSegments().append(segment);
++			   iter->GetSegments().push_back(*segment);
+             }
+          }
+       }
+Index: Magic2/Editor.h
+===================================================================
+--- Magic2/Editor.h	(revision 51)
++++ Magic2/Editor.h	(working copy)
+@@ -42,15 +42,15 @@
+ 
+    enum { MAP_NONE, MAP_PLANAR, MAP_CYLINDRICAL, MAP_SPHERICAL, MAP_STRETCH };
+ 
+-   void     ApplyMaterial(Material* material, List<Poly>& polys,
++   void     ApplyMaterial(Material* material, std::vector<Poly>& polys,
+                     int mapping, int axis, float scale_u, float scale_v,
+                     int flip, int mirror, int rotate);
+ 
+-   void     ApplyMaterialCylindrical(Material* material, List<Poly>& polys,
++   void     ApplyMaterialCylindrical(Material* material, std::vector<Poly>& polys,
+                     int axis, float scale_u, float scale_v,
+                     int flip, int mirror, int rotate);
+ 
+-   void     ApplyMaterialSpherical(Material* material, List<Poly>& polys,
++   void     ApplyMaterialSpherical(Material* material, std::vector<Poly>& polys,
+                     int axis, float scale_u, float scale_v,
+                     int flip, int mirror, int rotate);
+ 
+Index: Magic2/Locale_ss.cpp
+===================================================================
+--- Magic2/Locale_ss.cpp	(revision 51)
++++ Magic2/Locale_ss.cpp	(working copy)
+@@ -12,6 +12,7 @@
+ 	3D Locale (Polygon) Object
+ */
+ 
++#include <vector>
+ #include "MemDebug.h"
+ #include "Locale_ss.h"
+ 
+@@ -19,7 +20,7 @@
+ 
+ // +--------------------------------------------------------------------+
+ 
+-static List<Locale>   locales;
++static std::vector<Locale>   locales;
+ 
+ // +--------------------------------------------------------------------+
+ 
+@@ -53,14 +54,19 @@
+ 		}
+ 	}
+ 
+-	locales.append(this);
++	locales.push_back(*this);
+ }
+ 
+ // +--------------------------------------------------------------------+
+ 
+ Locale::~Locale()
+ {
+-	locales.remove(this);
++	for (auto l_it = locales.begin(); l_it != locales.end(); ++l_it) {
++		if (*l_it == *this) {
++			locales.erase(l_it);
++			return;
++		}
++	}
+ }
+ 
+ // +--------------------------------------------------------------------+
+@@ -124,24 +130,22 @@
+ Locale*
+ Locale::CreateLocale(const char* l, const char* c, const char* v)
+ {
+-	ListIter<Locale> iter = locales;
+-	while (++iter) {
+-		Locale* loc = iter.value();
+-		if (!_stricmp(l, loc->GetLanguage())) {
++	for (auto iter = locales.begin(); iter != locales.end(); ++iter) {
++		if (!_stricmp(l, iter->GetLanguage())) {
+ 			if (c && *c) {
+-				if (!_stricmp(c, loc->GetCountry())) {
++				if (!_stricmp(c, iter->GetCountry())) {
+ 					if (v && *v) {
+-						if (!_stricmp(v, loc->GetVariant())) {
+-							return loc;
++						if (!_stricmp(v, iter->GetVariant())) {
++							return &(*iter);
+ 						}
+ 					}
+ 					else {
+-						return loc;
++						return &(*iter);
+ 					}
+ 				}
+ 			}
+ 			else {
+-				return loc;
++				return &(*iter);
+ 			}
+ 		}
+ 	}
+@@ -161,7 +165,7 @@
+ 
+ // +--------------------------------------------------------------------+
+ 
+-const List<Locale>& 
++const std::vector<Locale>& 
+ Locale::GetAllLocales()
+ {
+ 	return locales;
+Index: Magic2/Locale_ss.h
+===================================================================
+--- Magic2/Locale_ss.h	(revision 51)
++++ Magic2/Locale_ss.h	(working copy)
+@@ -15,6 +15,7 @@
+ #ifndef Locale_h
+ #define Locale_h
+ 
++#include <vector>
+ #include "List.h"
+ #include "Text.h"
+ 
+@@ -31,7 +32,7 @@
+ 	int operator == (const Locale& that) const;
+ 
+ 	// Operations:
+-	static const List<Locale>& GetAllLocales();
++	static const std::vector<Locale>& GetAllLocales();
+ 	static Locale*             ParseLocale(const char* str);
+ 
+ 	// Property accessors:
+Index: Magic2/MagicDoc.cpp
+===================================================================
+--- Magic2/MagicDoc.cpp	(revision 51)
++++ Magic2/MagicDoc.cpp	(working copy)
+@@ -76,7 +76,7 @@
+ MagicDoc::InitCommandStack()
+ {
+    nundo = 0;
+-   commands.destroy();
++   commands.clear();
+ }
+ 
+ void
+@@ -85,7 +85,7 @@
+    int nredo = commands.size() - nundo;
+    
+    while (nredo) {
+-      delete commands.removeIndex(commands.size()-1);
++	   commands.pop_back();
+       nredo--;
+    }
+ 
+@@ -93,11 +93,11 @@
+       nundo++;
+    }
+    else {
+-      delete commands.removeIndex(0);
++	   commands.erase(commands.begin());
+    }
+ 
+    command->Do();
+-   commands.append(command);
++   commands.push_back(*command);
+ }
+ 
+ int
+@@ -116,7 +116,7 @@
+ MagicDoc::GetUndoName() const
+ {
+    if (nundo > 0 && nundo <= commands.size())
+-      return commands[nundo-1]->Name();
++      return commands[nundo-1].Name();
+    else
+       return "";
+ }
+@@ -125,7 +125,7 @@
+ MagicDoc::GetRedoName() const
+ {
+    if (nundo >= 0 && nundo < commands.size())
+-      return commands[nundo]->Name();
++      return commands[nundo].Name();
+    else
+       return "";
+ }
+@@ -134,14 +134,14 @@
+ MagicDoc::Undo()
+ {
+    if (nundo > 0 && nundo <= commands.size())
+-      commands[--nundo]->Undo();
++      commands[--nundo].Undo();
+ }
+ 
+ void
+ MagicDoc::Redo()
+ {
+    if (nundo >= 0 && nundo < commands.size())
+-      commands[nundo++]->Do();
++      commands[nundo++].Do();
+ }
+ 
+ // +--------------------------------------------------------------------+
+@@ -251,8 +251,10 @@
+             Model* orig = solid->GetModel();
+             Model* imported = s->GetModel();
+ 
+-            orig->GetMaterials().append(imported->GetMaterials());
+-            orig->GetSurfaces().append(imported->GetSurfaces());
++			for (auto matit = imported->GetMaterials().begin(); matit != imported->GetMaterials().end(); ++matit)
++				orig->GetMaterials().push_back(*matit);
++			for (auto surfit = imported->GetSurfaces().begin(); surfit != imported->GetSurfaces().end(); ++surfit)
++				orig->GetSurfaces().push_back(*surfit);
+             orig->OptimizeMaterials();
+ 
+             imported->GetMaterials().clear();
+@@ -288,8 +290,10 @@
+             Model* orig = solid->GetModel();
+             Model* imported = s->GetModel();
+ 
+-            orig->GetMaterials().append(imported->GetMaterials());
+-            orig->GetSurfaces().append(imported->GetSurfaces());
++            for (auto matit = imported->GetMaterials().begin(); matit != imported->GetMaterials().end(); ++matit)
++				orig->GetMaterials().push_back(*matit);
++			for (auto surfit = imported->GetSurfaces().begin(); surfit != imported->GetSurfaces().end(); ++surfit)
++				orig->GetSurfaces().push_back(*surfit);
+             orig->OptimizeMaterials();
+ 
+             imported->GetMaterials().clear();
+@@ -351,8 +355,10 @@
+          Model* orig = solid->GetModel();
+          Model* imported = s->GetModel();
+ 
+-         orig->GetMaterials().append(imported->GetMaterials());
+-         orig->GetSurfaces().append(imported->GetSurfaces());
++         for (auto matit = imported->GetMaterials().begin(); matit != imported->GetMaterials().end(); ++matit)
++			orig->GetMaterials().push_back(*matit);
++		 for (auto surfit = imported->GetSurfaces().begin(); surfit != imported->GetSurfaces().end(); ++surfit)
++			orig->GetSurfaces().push_back(*surfit);
+          orig->OptimizeMaterials();
+ 
+          imported->GetMaterials().clear();
+Index: Magic2/MagicDoc.h
+===================================================================
+--- Magic2/MagicDoc.h	(revision 51)
++++ Magic2/MagicDoc.h	(working copy)
+@@ -22,6 +22,7 @@
+ 
+ // +--------------------------------------------------------------------+
+ 
++#include <vector>
+ #include "List.h"
+ 
+ // +--------------------------------------------------------------------+
+@@ -92,8 +93,8 @@
+    Selector*      selector;
+    Editor*        editor;
+ 
+-   List<Command>  commands;
+-   int            nundo;
++   std::vector<Command>  commands;
++   size_t         nundo;
+ 
+ // Generated message map functions
+ protected:
+Index: Magic2/MagicView.cpp
+===================================================================
+--- Magic2/MagicView.cpp	(revision 51)
++++ Magic2/MagicView.cpp	(working copy)
+@@ -853,7 +853,7 @@
+       Material*   mtl      = 0;
+ 
+       if (dlg.mMaterialIndex >= 0) {
+-         mtl = solid->GetModel()->GetMaterials()[dlg.mMaterialIndex];
++         mtl = &solid->GetModel()->GetMaterials()[dlg.mMaterialIndex];
+       }
+ 
+       editor->UseModel(solid->GetModel());
+@@ -901,7 +901,7 @@
+    SetupModelViews();
+ 
+    if (seln && uvmap_view) {
+-      Poly* p = seln->GetPolys().first();
++      auto p = seln->GetPolys().begin();
+ 
+       if (p) {
+          uvmap_view->UseMaterial(p->material);
+Index: Magic2/Selection.h
+===================================================================
+--- Magic2/Selection.h	(revision 51)
++++ Magic2/Selection.h	(working copy)
+@@ -48,7 +48,7 @@
+    void           UseModel(Model* m)   { model = m;      }
+    void           UseView(ModelView* v){ model_view = v; }
+    Model*         GetModel()     const { return model;   }
+-   List<Poly>&    GetPolys()           { return polys;   }
++   std::vector<Poly>&    GetPolys()           { return polys;   }
+    std::vector<DWORD>&     GetVerts()  { return verts;   }
+ 
+    virtual void   Clear()              { polys.clear(); 
+@@ -64,7 +64,7 @@
+ protected:
+    Model*         model;
+    ModelView*     model_view;
+-   List<Poly>     polys;
++   std::vector<Poly>     polys;
+    std::vector<DWORD> verts;
+ };
+ 
+Index: Magic2/UVMapView.cpp
+===================================================================
+--- Magic2/UVMapView.cpp	(revision 51)
++++ Magic2/UVMapView.cpp	(working copy)
+@@ -73,19 +73,17 @@
+ 
+       window->DrawBitmap(x1, y1, x2, y2, bmp);
+ 
+-      ListIter<Poly> iter = polys;
+-      while (++iter) {
+-         Poly*       p     = iter.value();
+-         VertexSet*  vset  = p->vertex_set;
++      for (auto iter = polys.begin(); iter != polys.end(); ++iter) {
++         VertexSet*  vset  = iter->vertex_set;
+ 
+-         if (p->material != material)
++         if (iter->material != material)
+             continue;
+ 
+-         for (int i = 0; i < p->nverts; i++) {
+-            int    n1   = p->verts[i];
+-            int    n2   = p->verts[0];
+-            if (i < p->nverts-1)
+-               n2 = p->verts[i+1];
++         for (int i = 0; i < iter->nverts; i++) {
++            int    n1   = iter->verts[i];
++            int    n2   = iter->verts[0];
++            if (i < iter->nverts-1)
++               n2 = iter->verts[i+1];
+ 
+             double tu1  = vset->tu[n1];
+             double tv1  = vset->tv[n1];
+@@ -99,7 +97,7 @@
+ 
+             window->DrawLine(x1,   y1,   x2,   y2,   Color::Yellow);
+ 
+-            if (IsSelected(p, i))
++            if (IsSelected(&(*iter), i))
+                window->FillRect(x1-3, y1-3, x1+3, y1+3, Color::Yellow);
+             else
+                window->DrawRect(x1-2, y1-2, x1+2, y1+2, Color::Yellow);
+@@ -157,10 +155,10 @@
+ }
+ 
+ void 
+-UVMapView::UsePolys(List<Poly>& p)
++UVMapView::UsePolys(std::vector<Poly>& p)
+ {
+    polys.clear();
+-   polys.append(p);
++   polys = p;
+ }
+ 
+ void
+@@ -187,7 +185,7 @@
+       DWORD p     = value >> 16;
+       DWORD n     = value & 0xffff;
+ 
+-      Poly* poly = polys[p];
++      Poly* poly = &polys[p];
+       if (poly && n < poly->nverts) {
+          VertexSet*  vset = poly->vertex_set;
+          int         v    = poly->verts[n];
+@@ -245,9 +243,7 @@
+    // if only one mark:
+    if (nmarks < 2) {
+       // find all selected verts:
+-      ListIter<Poly> iter = polys;
+-      while (++iter) {
+-         Poly*       p     = iter.value();
++	   for (auto p = polys.begin(); p != polys.end(); ++p) {
+          VertexSet*  vset  = p->vertex_set;
+ 
+          for (int i = 0; i < p->nverts; i++) {
+@@ -262,7 +258,7 @@
+             int dy = abs(marks[0].y - y1);
+ 
+             if (dx < 4 && dy < 4) {
+-               WORD  p_index = iter.index();
++               WORD  p_index = p - polys.begin();
+                DWORD value   = (p_index << 16) | i;
+ 
+                if (select_mode == SELECT_REMOVE) {
+@@ -293,13 +289,11 @@
+       rgn.CreatePolygonRgn(marks, nmarks, WINDING);
+ 
+       // find all selected verts:
+-      ListIter<Poly> iter = polys;
+-      while (++iter) {
+-         Poly*       p     = iter.value();
+-         VertexSet*  vset  = p->vertex_set;
++	  for (auto pi = polys.begin(); pi != polys.end(); ++pi) {
++         VertexSet*  vset  = pi->vertex_set;
+ 
+-         for (int i = 0; i < p->nverts; i++) {
+-            int    n1   = p->verts[i];
++         for (int i = 0; i < pi->nverts; i++) {
++            int    n1   = pi->verts[i];
+             double tu1  = vset->tu[n1];
+             double tv1  = vset->tv[n1];
+ 
+@@ -309,7 +303,7 @@
+             CPoint p(x1,y1);
+ 
+             if (rgn.PtInRegion(p)) {
+-               WORD  p_index = iter.index();
++               WORD  p_index = pi - polys.begin();
+                DWORD value   = (p_index << 16) | i;
+ 
+                if (select_mode == SELECT_REMOVE) {
+@@ -342,15 +336,12 @@
+ {
+    selverts.clear();
+ 
+-   ListIter<Poly> iter = polys;
+-   while (++iter) {
+-      Poly* p = iter.value();
+-
++   for (auto p = polys.begin(); p != polys.end(); ++p) {
+       if (p->material != material)
+          continue;
+ 
+       for (int i = 0; i < p->nverts; i++) {
+-         WORD  p_index = iter.index();
++         WORD  p_index = p - polys.begin();
+          DWORD value   = (p_index << 16) | i;
+ 		 selverts.push_back(value);
+       }
+@@ -366,15 +357,12 @@
+ void
+ UVMapView::SelectInverse()
+ {
+-   ListIter<Poly> iter = polys;
+-   while (++iter) {
+-      Poly* p = iter.value();
+-
++   for (auto p = polys.begin(); p != polys.end(); ++p) {
+       if (p->material != material)
+          continue;
+ 
+       for (int i = 0; i < p->nverts; i++) {
+-         WORD  p_index = iter.index();
++         WORD  p_index = p - polys.begin();
+          DWORD value   = (p_index << 16) | i;
+ 
+ 		 bool contains = false;
+@@ -395,7 +383,13 @@
+ bool
+ UVMapView::IsSelected(Poly* poly, WORD v)
+ {
+-   WORD p = polys.index(poly);
++	WORD p = -1;
++	for (auto pit = polys.begin(); pit != polys.end(); ++pit) {
++		if (*pit == *poly) {
++			p = pit - polys.begin();
++			break;
++		}
++	}
+    DWORD value = (p << 16) | v;
+ 
+    bool contains = false;
+@@ -421,9 +415,7 @@
+    double   cy  = window->Height() / 2 + y_offset;
+ 
+    // find first selected vert:
+-   ListIter<Poly> iter = polys;
+-   while (++iter) {
+-      Poly*       poly  = iter.value();
++   for (auto poly = polys.begin(); poly != polys.end(); ++poly) {
+       VertexSet*  vset  = poly->vertex_set;
+ 
+       for (int i = 0; i < poly->nverts; i++) {
+Index: Magic2/UVMapView.h
+===================================================================
+--- Magic2/UVMapView.h	(revision 51)
++++ Magic2/UVMapView.h	(working copy)
+@@ -38,7 +38,7 @@
+    virtual void Refresh();
+ 
+    void        UseMaterial(Material* m);
+-   void        UsePolys(List<Poly>& p);
++   void        UsePolys(std::vector<Poly>& p);
+ 
+    void        MoveBy(double dx, double dy);
+    void        DragBy(double dx, double dy);
+@@ -62,7 +62,7 @@
+    enum { MAX_MARK = 4096 };
+ 
+    Material*   material;
+-   List<Poly>  polys;
++   std::vector<Poly>  polys;
+    Video*      video;
+ 
+    double      zoom;
+Index: Magic2/VideoDX9.h
+===================================================================
+--- Magic2/VideoDX9.h	(revision 51)
++++ Magic2/VideoDX9.h	(working copy)
+@@ -15,6 +15,7 @@
+ #ifndef VideoDX9_h
+ #define VideoDX9_h
+ 
++#include <vector>
+ #include "Video.h"
+ #include "VideoSettings.h"
+ #include "List.h"
+@@ -89,7 +90,7 @@
+ 	virtual bool   SetCamera(const Camera* cam);
+ 	virtual bool   SetEnvironment(Bitmap** faces);
+ 	virtual bool   SetAmbient(Color c);
+-	virtual bool   SetLights(const List<Light>& lights);
++	virtual bool   SetLights(const std::vector<Light>& lights);
+ 	virtual bool   SetProjection(float fov, 
+ 	float znear=1.0f, 
+ 	float zfar=1.0e6f, 
+Index: nGenEx/ActiveWindow.cpp
+===================================================================
+--- nGenEx/ActiveWindow.cpp	(revision 51)
++++ nGenEx/ActiveWindow.cpp	(working copy)
+@@ -74,8 +74,8 @@
+ 
+ 	screen->DelWindow(this);
+ 	Hide();
+-	clients.destroy();
+-	children.destroy();
++	clients.clear();
++	children.clear();
+ 
+ 	if (polys)  delete [] polys;
+ 	if (vset)   delete    vset;
+@@ -91,16 +91,16 @@
+ 	if (dispatch)
+ 	dispatch->Register(this);
+ 
+-	ListIter<View> v_iter = view_list;
+-	while (++v_iter) {
+-		View* view = v_iter.value();
+-		view->OnShow();
++	auto v_iter = view_list.begin();
++	while (v_iter != view_list.end()) {
++		v_iter->OnShow();
++		++v_iter;
+ 	}
+ 
+-	ListIter<ActiveWindow> c_iter = children;
+-	while (++c_iter) {
+-		ActiveWindow* child = c_iter.value();
+-		child->Show();
++	auto c_iter = children.begin();
++	while (c_iter != children.end()) {
++		c_iter->Show();
++		++c_iter;
+ 	}
+ 
+ 	shown = true;
+@@ -117,16 +117,16 @@
+ 		focus = false;
+ 	}
+ 
+-	ListIter<View> v_iter = view_list;
+-	while (++v_iter) {
+-		View* view = v_iter.value();
+-		view->OnHide();
++	auto v_iter = view_list.begin();
++	while (v_iter != view_list.end()) {
++		v_iter->OnHide();
++		++v_iter;
+ 	}
+ 
+-	ListIter<ActiveWindow> c_iter = children;
+-	while (++c_iter) {
+-		ActiveWindow* child = c_iter.value();
+-		child->Hide();
++	auto c_iter = children.begin();
++	while (c_iter != children.end()) {
++		c_iter->Hide();
++		++c_iter;
+ 	}
+ 
+ 	shown = false;
+@@ -146,9 +146,11 @@
+ 	rect = r;
+ 	CalcGrid();
+ 
+-	ListIter<View> v = view_list;
+-	while (++v)
+-	v->OnWindowMove();
++	auto v = view_list.begin();
++	while (v != view_list.end()) {
++		v->OnWindowMove();
++		++v;
++	}
+ 
+ 	if (layout)
+ 	layout->DoLayout(this);
+@@ -160,7 +162,7 @@
+ ActiveWindow::AddChild(ActiveWindow* child)
+ {
+ 	if (child)
+-	children.append(child);
++		children.push_back(*child);
+ }
+ 
+ // +--------------------------------------------------------------------+
+@@ -258,9 +260,8 @@
+ 	}
+ 
+ 	if (enabled && view_list.size()) {
+-		ListIter<View> v = view_list;
+-		while (++v)
+-		v->Refresh();
++		for( auto v = view_list.begin(); v != view_list.end(); ++v)
++			v->Refresh();
+ 	}
+ 
+ 	if (!transparent) {
+@@ -274,10 +275,10 @@
+ 	SetAlpha(old_alpha);
+ 
+ 	// update children windows:
+-	ListIter<ActiveWindow> iter = children;
+-	while (++iter) {
+-		ActiveWindow* child = iter.value();
+-		child->Draw();
++	auto iter = children.begin();
++	while (iter != children.end()) {
++		iter->Draw();
++		++iter;
+ 	}
+ }
+ 
+@@ -781,17 +782,19 @@
+ 	AWMap* map = new(__FILE__,__LINE__) AWMap(eid, client, callback);
+ 
+ 	if (map != 0)
+-	clients.append(map);
++		clients.push_back(*map);
+ }
+ 
+ void
+ ActiveWindow::UnregisterClient(int eid, ActiveWindow* client)
+ {
+ 	AWMap test(eid, client, 0);
+-	int   index = clients.index(&test);
+-
+-	if (index >= 0)
+-	delete clients.removeIndex(index);
++	for (auto c_iter = clients.begin(); c_iter != clients.end(); ++c_iter) {
++		if (*c_iter == test) {
++			clients.erase(c_iter);
++			return;
++		}
++	}
+ }
+ 
+ void
+@@ -802,10 +805,11 @@
+ 	event.x      = x;
+ 	event.y      = y;
+ 
+-	ListIter<AWMap> map = clients;
+-	while (++map) {
++	auto map = clients.begin();
++	while (map != clients.end()) {
+ 		if (map->eid == eid)
+-		map->func(map->client, &event);
++			map->func(map->client, &event);
++		++map;
+ 	}
+ }   
+ 
+@@ -968,16 +972,18 @@
+ ActiveWindow*
+ ActiveWindow::FindChild(DWORD id)
+ {
+-	ListIter<ActiveWindow> iter = children;
+-	while (++iter) {
+-		ActiveWindow* w = iter.value();
++	size_t i = 0;
++	while (i < children.size()) {
++		ActiveWindow* w = &children[i];
+ 		if (w->GetID() == id)
+-		return w;
++			return w;
+ 
+ 		ActiveWindow* w2 = w->FindChild(id);
+ 
+ 		if (w2)
+-		return w2;
++			return w2;
++
++		++i;
+ 	}
+ 
+ 	return 0;
+@@ -991,11 +997,12 @@
+ {
+ 	ActiveWindow* mouse_tgt = 0;
+ 
+-	ListIter<ActiveWindow> iter = children;
+-	while (++iter) {
+-		ActiveWindow* test = iter.value();
+-		if (test->TargetRect().Contains(x,y))
+-		mouse_tgt = test;
++	auto iter = children.begin();
++	while (iter != children.end()) {
++		ActiveWindow test = *iter;
++		if (iter->TargetRect().Contains(x,y))
++			mouse_tgt = &test;
++		++iter;
+ 	}
+ 
+ 	return mouse_tgt;
+Index: nGenEx/ActiveWindow.h
+===================================================================
+--- nGenEx/ActiveWindow.h	(revision 51)
++++ nGenEx/ActiveWindow.h	(working copy)
+@@ -205,7 +205,7 @@
+ 	void              SetTextInsets(const Insets& t);
+ 	Insets&           GetTextInsets()         { return text_insets; }
+ 
+-	List<ActiveWindow>& GetChildren()         { return children;    }
++	std::vector<ActiveWindow>& GetChildren()         { return children;    }
+ 	void              SetCellInsets(const Insets& c);
+ 	Insets&           GetCellInsets()         { return cell_insets; }
+ 	void              SetCells(int cx, int cy, int cw=1, int ch=1);
+@@ -296,8 +296,8 @@
+ 	bool              topmost;
+ 
+ 	Layout*              layout;
+-	List<ActiveWindow>   children;
+-	List<AWMap>          clients;
++	std::vector<ActiveWindow>   children;
++	std::vector<AWMap>          clients;
+ 	AWEvent              event;
+ 
+ 	int               rows;
+Index: nGenEx/Bitmap.cpp
+===================================================================
+--- nGenEx/Bitmap.cpp	(revision 51)
++++ nGenEx/Bitmap.cpp	(working copy)
+@@ -12,6 +12,7 @@
+ 	Bitmap Resource class
+ */
+ 
++#include <vector>
+ #include "MemDebug.h"
+ #include "Bitmap.h"
+ #include "Video.h"
+@@ -830,14 +831,14 @@
+ 
+ // +--------------------------------------------------------------------+
+ 
+-static List<Bitmap>  bitmap_cache;
++static std::vector<Bitmap>  bitmap_cache;
+ 
+ Bitmap*
+ Bitmap::GetBitmapByID(HANDLE bmp_id)
+ {
+-	for (int i = 0; i < bitmap_cache.size(); i++) {
+-		if (bitmap_cache[i]->Handle() == bmp_id) {
+-			return bitmap_cache[i];
++	for (auto bmi = bitmap_cache.begin(); bmi != bitmap_cache.end(); ++bmi) {
++		if (bmi->Handle() == bmp_id) {
++			return &(*bmi);
+ 		}
+ 	}
+ 
+@@ -847,9 +848,9 @@
+ Bitmap*
+ Bitmap::CheckCache(const char* filename)
+ {
+-	for (int i = 0; i < bitmap_cache.size(); i++) {
+-		if (!_stricmp(bitmap_cache[i]->GetFilename(), filename)) {
+-			return bitmap_cache[i];
++	for (auto bmi = bitmap_cache.begin(); bmi != bitmap_cache.end(); ++bmi) {
++		if (!_stricmp(bmi->GetFilename(), filename)) {
++			return &(*bmi);
+ 		}
+ 	}
+ 
+@@ -859,24 +860,22 @@
+ void
+ Bitmap::AddToCache(Bitmap* bmp)
+ {
+-	bitmap_cache.append(bmp);
++	bitmap_cache.push_back(*bmp);
+ }
+ 
+ void
+ Bitmap::CacheUpdate()
+ {
+-	for (int i = 0; i < bitmap_cache.size(); i++) {
+-		Bitmap* bmp = bitmap_cache[i];
+-
+-		if (bmp->IsTexture())
+-		bmp->MakeTexture();
++	for (auto bmi = bitmap_cache.begin(); bmi != bitmap_cache.end(); ++bmi) {
++		if (bmi->IsTexture())
++			bmi->MakeTexture();
+ 	}
+ }
+ 
+ void
+ Bitmap::ClearCache()
+ {
+-	bitmap_cache.destroy();
++	bitmap_cache.clear();
+ }
+ 
+ DWORD
+@@ -885,14 +884,12 @@
+ 	DWORD result = sizeof(bitmap_cache);
+ 	result += bitmap_cache.size() * sizeof(Bitmap*);
+ 
+-	for (int i = 0; i < bitmap_cache.size(); i++) {
+-		Bitmap* bmp = bitmap_cache[i];
++	for (auto bmi = bitmap_cache.begin(); bmi != bitmap_cache.end(); ++bmi) {
++		if (bmi->pix)
++		result += bmi->mapsize * sizeof(ColorIndex);
+ 
+-		if (bmp->pix)
+-		result += bmp->mapsize * sizeof(ColorIndex);
+-
+-		if (bmp->hipix)
+-		result += bmp->mapsize * sizeof(Color);
++		if (bmi->hipix)
++		result += bmi->mapsize * sizeof(Color);
+ 	}
+ 
+ 	return result;
+Index: nGenEx/DataLoader.cpp
+===================================================================
+--- nGenEx/DataLoader.cpp	(revision 51)
++++ nGenEx/DataLoader.cpp	(working copy)
+@@ -26,7 +26,7 @@
+ static DataLoader*   def_loader = 0;
+ DataLoader*   DataLoader::loader = 0;
+ 
+-static List<DataArchive>   archives;
++static std::vector<DataArchive>   archives;
+ 
+ // +--------------------------------------------------------------------+
+ 
+@@ -50,13 +50,13 @@
+ 	def_loader = new(__FILE__,__LINE__) DataLoader;
+ 	loader = def_loader;
+ 
+-	archives.destroy();
++	archives.clear();
+ }
+ 
+ void
+ DataLoader::Close()
+ {
+-	archives.destroy();
++	archives.clear();
+ 	Bitmap::ClearCache();
+ 
+ 	delete def_loader;
+@@ -103,16 +103,15 @@
+ 			status = DATAFILE_OK;
+ 
+ 			bool found = false;
+-			ListIter<DataArchive> iter = archives;
+-			while (++iter && !found) {
+-				DataArchive* archive = iter.value();
+-				if (!strcmp(archive->Name(), name)) {
++			for (auto arit = archives.begin(); arit != archives.end() && !found; ++arit) {
++				if (!strcmp(arit->Name(), name)) {
+ 					found = true;
++					break;
+ 				}
+ 			}
+ 
+ 			if (!found)
+-			archives.append(a);
++				archives.push_back(*a);
+ 		}
+ 		else {
+ 			Print("   WARNING: invalid data file '%s'\n", name);
+@@ -134,11 +133,9 @@
+ int
+ DataLoader::DisableDatafile(const char* name)
+ {
+-	ListIter<DataArchive> iter = archives;
+-	while (++iter) {
+-		DataArchive* a = iter.value();
+-		if (!strcmp(a->Name(), name)) {
+-			delete iter.removeItem();
++	for (auto arit = archives.begin(); arit != archives.end(); ++arit) {
++		if (!strcmp(arit->Name(), name)) {
++			archives.erase(arit);
+ 			return DATAFILE_OK;
+ 		}
+ 	}
+@@ -179,10 +176,8 @@
+ 	}
+ 
+ 	// then check datafiles, from last to first:
+-	int narchives = archives.size();
+-	for (int i = 0; i < narchives; i++) {
+-		DataArchive* a = archives[narchives-1-i];
+-		if (a->FindEntry(filename) > -1) {
++	for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
++		if (arit->FindEntry(filename) > -1) {
+ 			return true;
+ 		}
+ 	}
+@@ -193,35 +188,34 @@
+ // +--------------------------------------------------------------------+
+ 
+ int
+-DataLoader::ListFiles(const char* filter, List<Text>& list, bool recurse)
++DataLoader::ListFiles(const char* filter, std::vector<Text>& list, bool recurse)
+ {
+-	list.destroy();
++	list.clear();
+ 
+ 	ListFileSystem(filter, list, datapath, recurse);
+ 
+ 	// then check datafile(s):
+ 	int narchives = archives.size();
+-	for (int i = 0; i < narchives; i++) {
+-		DataArchive* a = archives[narchives-1-i];
+-		ListArchiveFiles(a->Name(), filter, list);
++	for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
++		ListArchiveFiles(arit->Name(), filter, list);
+ 	}
+ 
+ 	return list.size();
+ }
+ 
+ int
+-DataLoader::ListArchiveFiles(const char* archive_name, const char* filter, List<Text> &list)
++DataLoader::ListArchiveFiles(const char* archive_name, const char* filter, std::vector<Text> &list)
+ {
+ 	int            pathlen  = datapath.length();
+ 	DataArchive*   a        = 0;
+ 
+ 	if (archive_name) {
+ 		int narchives = archives.size();
+-		for (int i = 0; i < narchives && !a; i++) {
+-			a = archives[narchives-1-i];
+-
++		for (auto arit = archives.rbegin(); arit != archives.rend() && !a; ++arit) {
+ 			if (_stricmp(a->Name(), archive_name))
+-			a = 0;
++				a = 0;
++			else
++				a = &(*arit);
+ 		}
+ 	}
+ 
+@@ -240,8 +234,15 @@
+ 			if (entry_name.contains(datapath)) {
+ 				Text fname = entry_name(pathlen, 1000);
+ 
+-				if (!list.contains(&fname))
+-				list.append(new Text(fname));
++				bool contains = false;
++				for (auto listit = list.begin(); listit != list.end(); ++listit) {
++					if (*listit == fname) {
++						contains = true;
++						break;
++					}
++				}
++				if (!contains)
++					list.push_back(fname);
+ 			}
+ 		}
+ 	}
+@@ -267,8 +268,15 @@
+ 			if (entry_name.contains(datapath) && entry_name.contains(data_filter)) {
+ 				Text fname = entry_name(pathlen, 1000);
+ 
+-				if (!list.contains(&fname))
+-				list.append(new Text(fname));
++				bool contains = false;
++				for (auto listit = list.begin(); listit != list.end(); ++listit) {
++					if (*listit == fname) {
++						contains = true;
++						break;
++					}
++				}
++				if (!contains)
++					list.push_back(fname);
+ 			}
+ 		}
+ 	}
+@@ -279,7 +287,7 @@
+ // +--------------------------------------------------------------------+
+ 
+ void
+-DataLoader::ListFileSystem(const char* filter, List<Text>& list, Text base_path, bool recurse)
++DataLoader::ListFileSystem(const char* filter, std::vector<Text>& list, Text base_path, bool recurse)
+ {
+ 	if (use_file_system) {
+ 		char data_filter[256];
+@@ -330,7 +338,7 @@
+ 						Text full_name = datapath;
+ 						full_name += data.cFileName;
+ 
+-						list.append(new Text(full_name(pathlen, 1000)));
++						list.push_back(full_name(pathlen, 1000));
+ 					}
+ 				}
+ 			}
+@@ -386,21 +394,19 @@
+ 	// vox files are usually in their own archive,
+ 	// so check there first
+ 	if (narchives > 1 && strstr(filename, "Vox")) {
+-		for (int i = 0; i < narchives; i++) {
+-			DataArchive* a = archives[narchives-1-i];
+-			if (strstr(a->Name(), "vox")) {
+-				int index = a->FindEntry(filename);
++		for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
++			if (strstr(arit->Name(), "vox")) {
++				int index = arit->FindEntry(filename);
+ 				if (index > -1)
+-				return a->ExpandEntry(index, buf, null_terminate);
++					return arit->ExpandEntry(index, buf, null_terminate);
+ 			}
+ 		}
+ 	}
+ 
+-	for (int i = 0; i < narchives; i++) {
+-		DataArchive* a = archives[narchives-1-i];
+-		int index = a->FindEntry(filename);
++	for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
++		int index = arit->FindEntry(filename);
+ 		if (index > -1)
+-		return a->ExpandEntry(index, buf, null_terminate);
++		return arit->ExpandEntry(index, buf, null_terminate);
+ 	}
+ 
+ 	if (!optional)
+@@ -599,12 +605,10 @@
+ 		int   len     = 0;
+ 		BYTE* tmp_buf = 0;
+ 
+-		int narchives = archives.size();
+-		for (int i = 0; i < narchives; i++) {
+-			DataArchive* a = archives[narchives-1-i];
+-			int index = a->FindEntry(filename);
++		for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
++			int index = arit->FindEntry(filename);
+ 			if (index > -1) {
+-				len = a->ExpandEntry(index, tmp_buf);
++				len = arit->ExpandEntry(index, tmp_buf);
+ 
+ 				if (pcx_file)
+ 				pcx.LoadBuffer(tmp_buf, len);
+@@ -695,12 +699,10 @@
+ 		int   len     = 0;
+ 		BYTE* tmp_buf = 0;
+ 
+-		int narchives = archives.size();
+-		for (int i = 0; i < narchives; i++) {
+-			DataArchive* a = archives[narchives-1-i];
+-			int index = a->FindEntry(filename);
++		for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
++			int index = arit->FindEntry(filename);
+ 			if (index > -1) {
+-				len = a->ExpandEntry(index, tmp_buf);
++				len = arit->ExpandEntry(index, tmp_buf);
+ 
+ 				if (pcx_file)
+ 				pcx.LoadBuffer(tmp_buf, len);
+@@ -778,12 +780,10 @@
+ 		int   len     = 0;
+ 		BYTE* tmp_buf = 0;
+ 
+-		int narchives = archives.size();
+-		for (int i = 0; i < narchives; i++) {
+-			DataArchive* a = archives[narchives-1-i];
+-			int index = a->FindEntry(filename);
++		for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
++			int index = arit->FindEntry(filename);
+ 			if (index > -1) {
+-				len = a->ExpandEntry(index, tmp_buf);
++				len = arit->ExpandEntry(index, tmp_buf);
+ 
+ 				if (pcx_file)
+ 				pcx.LoadBuffer(tmp_buf, len);
+Index: nGenEx/DataLoader.h
+===================================================================
+--- nGenEx/DataLoader.h	(revision 51)
++++ nGenEx/DataLoader.h	(working copy)
+@@ -11,6 +11,7 @@
+ #ifndef DataLoader_h
+ #define DataLoader_h
+ 
++#include <vector>
+ #include "Types.h"
+ #include "List.h"
+ #include "Text.h"
+@@ -51,8 +52,8 @@
+ 	bool  IsMediaLoadEnabled()  const { return enable_media;   }
+ 
+ 	bool  FindFile(const char* fname);
+-	int   ListFiles(const char* filter, List<Text>& list, bool recurse=false);
+-	int   ListArchiveFiles(const char* archive, const char* filter, List<Text>& list);
++	int   ListFiles(const char* filter, std::vector<Text>& list, bool recurse=false);
++	int   ListArchiveFiles(const char* archive, const char* filter, std::vector<Text>& list);
+ 	int   LoadBuffer(const char* name, BYTE*&  buf, bool null_terminate=false, bool optional=false);
+ 	int   LoadBitmap(const char* name, Bitmap& bmp, int type=0, bool optional=false);
+ 	int   CacheBitmap(const char* name, Bitmap*& bmp, int type=0, bool optional=false);
+@@ -68,7 +69,7 @@
+ 	int   LoadHiColor(const char* name, Bitmap& bmp, int type);
+ 	int   LoadAlpha(  const char* name, Bitmap& bmp, int type);
+ 
+-	void  ListFileSystem(const char* filter, List<Text>& list, Text base_path, bool recurse);
++	void  ListFileSystem(const char* filter, std::vector<Text>& list, Text base_path, bool recurse);
+ 	int   LoadPartialFile(const char* fname, BYTE*& buf, int max_load, bool optional=false);
+ 	int   LoadOggStream(const char* fname, Sound*& snd);
+ 
+Index: nGenEx/FontMgr.cpp
+===================================================================
+--- nGenEx/FontMgr.cpp	(revision 51)
++++ nGenEx/FontMgr.cpp	(working copy)
+@@ -17,14 +17,14 @@
+ 
+ // +--------------------------------------------------------------------+
+ 
+-List<FontItem> FontMgr::fonts;
++std::vector<FontItem> FontMgr::fonts;
+ 
+ // +--------------------------------------------------------------------+
+ 
+ void
+ FontMgr::Close()
+ {
+-	fonts.destroy();
++	fonts.clear();
+ }
+ 
+ // +--------------------------------------------------------------------+
+@@ -39,7 +39,7 @@
+ 		item->size = 0;
+ 		item->font = font;
+ 
+-		fonts.append(item);
++		fonts.push_back(*item);
+ 	}
+ }
+ 
+@@ -48,10 +48,9 @@
+ Font*
+ FontMgr::Find(const char* name)
+ {
+-	ListIter<FontItem> item = fonts;
+-	while (++item) {
+-		if (item->name == name)
+-		return item->font;
++	for (auto fiter = fonts.begin(); fiter != fonts.end(); ++fiter) {
++		if (fiter->name == name)
++			return fiter->font;
+ 	}
+ 
+ 	return 0;
+Index: nGenEx/FontMgr.h
+===================================================================
+--- nGenEx/FontMgr.h	(revision 51)
++++ nGenEx/FontMgr.h	(working copy)
+@@ -15,6 +15,7 @@
+ #ifndef FontMgr_h
+ #define FontMgr_h
+ 
++#include <vector>
+ #include "Types.h"
+ #include "Color.h"
+ #include "List.h"
+@@ -43,7 +44,7 @@
+ 	static Font*   Find(const char* name);
+ 
+ private:
+-	static List<FontItem> fonts;
++	static std::vector<FontItem> fonts;
+ };
+ 
+ #endif FontMgr_h
+Index: nGenEx/FormWindow.h
+===================================================================
+--- nGenEx/FormWindow.h	(revision 51)
++++ nGenEx/FormWindow.h	(working copy)
+@@ -60,7 +60,7 @@
+ 	virtual Slider*         CreateSlider(     const char* text, int x, int y, int w, int h, DWORD id=0, DWORD pid=0, DWORD style=0);
+ 
+ 	// property accessors:
+-	ListIter<ActiveWindow>  Controls() { return children; }
++	std::vector<ActiveWindow> Controls() { return children; }
+ 
+ protected:
+ 	virtual void            CreateDefLabel(CtrlDef& def);
+Index: nGenEx/Game.cpp
+===================================================================
+--- nGenEx/Game.cpp	(revision 51)
++++ nGenEx/Game.cpp	(working copy)
+@@ -8,6 +8,7 @@
+ 
+ */
+ 
++#include <vector>
+ #include "MemDebug.h"
+ #include "Game.h"
+ #include "Mouse.h"
+@@ -727,14 +728,12 @@
+ Game::InitContent()
+ {
+ 	DataLoader* loader = DataLoader::GetLoader();
+-	List<Text>  bundles;
++	std::vector<Text>  bundles;
+ 
+ 	loader->SetDataPath("Content/");
+ 	loader->ListFiles("content*", bundles);
+ 
+-	ListIter<Text> iter = bundles;
+-	while (++iter) {
+-		Text* filename = iter.value();
++	for (auto filename = bundles.begin(); filename != bundles.end(); ++filename) {
+ 		int   n        = filename->indexOf('_');
+ 
+ 		if (n > 0) {
+@@ -1111,12 +1110,11 @@
+ 		bool use_file_sys = loader->IsFileSystemEnabled();
+ 		loader->UseFileSystem(true);
+ 		loader->SetDataPath(0);
+-		List<Text> shot_list;
++		std::vector<Text> shot_list;
+ 		loader->ListFiles("*.PCX", shot_list);
+ 		loader->UseFileSystem(use_file_sys);
+ 
+-		for (int i = 0; i < shot_list.size(); i++) {
+-			Text* s = shot_list[i];
++		for (auto s = shot_list.begin(); s != shot_list.end(); ++s) {
+ 			int   n = 0;
+ 
+ 			sscanf_s(s->data()+1, "%d", &n);
+@@ -1124,7 +1122,7 @@
+ 			shot_num = n+1;
+ 		}
+ 
+-		shot_list.destroy();
++		shot_list.clear();
+ 	}
+ 
+ 	if (name)
+@@ -1160,12 +1158,11 @@
+ 			bool use_file_sys = loader->IsFileSystemEnabled();
+ 			loader->UseFileSystem(true);
+ 			loader->SetDataPath(0);
+-			List<Text> avi_list;
++			std::vector<Text> avi_list;
+ 			loader->ListFiles("*.avi", avi_list);
+ 			loader->UseFileSystem(use_file_sys);
+ 
+-			for (int i = 0; i < avi_list.size(); i++) {
+-				Text* s = avi_list[i];
++			for (auto s = avi_list.begin(); s != avi_list.end(); ++s) {
+ 				int   n = 0;
+ 
+ 				sscanf_s(s->data()+1, "%d", &n);
+@@ -1173,7 +1170,7 @@
+ 				avi_num = n+1;
+ 			}
+ 
+-			avi_list.destroy();
++			avi_list.clear();
+ 		}
+ 
+ 		if (name)
+Index: nGenEx/ListBox.cpp
+===================================================================
+--- nGenEx/ListBox.cpp	(revision 51)
++++ nGenEx/ListBox.cpp	(working copy)
+@@ -12,6 +12,8 @@
+ 	ListBox ActiveWindow class
+ */
+ 
++#include <vector>
++#include <algorithm>
+ #include "MemDebug.h"
+ #include "ListBox.h"
+ #include "Button.h"
+@@ -44,7 +46,7 @@
+ 	static const char* TYPENAME() { return "ListBoxItem"; }
+ 
+ 	ListBoxItem() : data(0), image(0), selected(false), listbox(0), color(Color::White) { }
+-	~ListBoxItem() { subitems.destroy(); }
++	~ListBoxItem() { subitems.clear(); }
+ 
+ 	int operator < (const ListBoxItem& item) const;
+ 	int operator <=(const ListBoxItem& item) const;
+@@ -55,7 +57,7 @@
+ 	Bitmap*              image;
+ 	bool                 selected;
+ 	Color                color;
+-	List<ListBoxCell>    subitems;
++	std::vector<ListBoxCell>    subitems;
+ 
+ 	ListBox*             listbox;
+ };
+@@ -83,7 +85,7 @@
+ 
+ int ListBoxItem::operator < (const ListBoxItem& item) const
+ {
+-	int sort_column   = listbox->GetSortColumn() - 1;
++	size_t sort_column   = listbox->GetSortColumn() - 1;
+ 	int sort_criteria = listbox->GetSortCriteria();
+ 
+ 	if (listbox && listbox == item.listbox) {
+@@ -109,16 +111,16 @@
+ 
+ 			switch (sort_criteria) {
+ 			case ListBox::LIST_SORT_NUMERIC_DESCENDING:
+-				return subitems[sort_column]->data > item.subitems[sort_column]->data;
++				return subitems[sort_column].data > item.subitems[sort_column].data;
+ 
+ 			case ListBox::LIST_SORT_ALPHA_DESCENDING:
+-				return subitems[sort_column]->text > item.subitems[sort_column]->text;
++				return subitems[sort_column].text > item.subitems[sort_column].text;
+ 
+ 			case ListBox::LIST_SORT_ALPHA_ASCENDING:
+-				return subitems[sort_column]->text < item.subitems[sort_column]->text;
++				return subitems[sort_column].text < item.subitems[sort_column].text;
+ 
+ 			case ListBox::LIST_SORT_NUMERIC_ASCENDING:
+-				return subitems[sort_column]->data < item.subitems[sort_column]->data;
++				return subitems[sort_column].data < item.subitems[sort_column].data;
+ 			}
+ 		}
+ 	}
+@@ -130,7 +132,7 @@
+ 
+ int ListBoxItem::operator <=(const ListBoxItem& item) const
+ {
+-	int sort_column   = listbox->GetSortColumn() - 1;
++	size_t sort_column   = listbox->GetSortColumn() - 1;
+ 	int sort_criteria = listbox->GetSortCriteria();
+ 
+ 	if (listbox && listbox == item.listbox) {
+@@ -156,16 +158,16 @@
+ 
+ 			switch (sort_criteria) {
+ 			case ListBox::LIST_SORT_NUMERIC_DESCENDING:
+-				return subitems[sort_column]->data >= item.subitems[sort_column]->data;
++				return subitems[sort_column].data >= item.subitems[sort_column].data;
+ 
+ 			case ListBox::LIST_SORT_ALPHA_DESCENDING:
+-				return subitems[sort_column]->text >= item.subitems[sort_column]->text;
++				return subitems[sort_column].text >= item.subitems[sort_column].text;
+ 
+ 			case ListBox::LIST_SORT_ALPHA_ASCENDING:
+-				return subitems[sort_column]->text <= item.subitems[sort_column]->text;
++				return subitems[sort_column].text <= item.subitems[sort_column].text;
+ 
+ 			case ListBox::LIST_SORT_NUMERIC_ASCENDING:
+-				return subitems[sort_column]->data <= item.subitems[sort_column]->data;
++				return subitems[sort_column].data <= item.subitems[sort_column].data;
+ 			}
+ 		}
+ 	}
+@@ -177,7 +179,7 @@
+ 
+ int ListBoxItem::operator == (const ListBoxItem& item) const
+ {
+-	int sort_column   = listbox->GetSortColumn() - 1;
++	size_t sort_column   = listbox->GetSortColumn() - 1;
+ 	int sort_criteria = listbox->GetSortCriteria();
+ 
+ 	if (listbox && listbox == item.listbox) {
+@@ -203,16 +205,16 @@
+ 
+ 			switch (sort_criteria) {
+ 			case ListBox::LIST_SORT_NUMERIC_DESCENDING:
+-				return subitems[sort_column]->data == item.subitems[sort_column]->data;
++				return subitems[sort_column].data == item.subitems[sort_column].data;
+ 
+ 			case ListBox::LIST_SORT_ALPHA_DESCENDING:
+-				return subitems[sort_column]->text == item.subitems[sort_column]->text;
++				return subitems[sort_column].text == item.subitems[sort_column].text;
+ 
+ 			case ListBox::LIST_SORT_ALPHA_ASCENDING:
+-				return subitems[sort_column]->text == item.subitems[sort_column]->text;
++				return subitems[sort_column].text == item.subitems[sort_column].text;
+ 
+ 			case ListBox::LIST_SORT_NUMERIC_ASCENDING:
+-				return subitems[sort_column]->data == item.subitems[sort_column]->data;
++				return subitems[sort_column].data == item.subitems[sort_column].data;
+ 			}
+ 		}
+ 	}
+@@ -266,8 +268,8 @@
+ 
+ ListBox::~ListBox()
+ {
+-	items.destroy();
+-	columns.destroy();
++	items.clear();
++	columns.clear();
+ }
+ 
+ // +--------------------------------------------------------------------+
+@@ -316,12 +318,9 @@
+ 		item_rect.h = line_height;
+ 	}
+ 
+-	int index = 0;
+-	ListIter<ListBoxItem> iter = items;
++	size_t index = 0;
+ 
+-	while (++iter && item_rect.y < h) {
+-		ListBoxItem* item = iter.value();
+-
++	for (auto item = items.begin(); item != items.end(); ++item) {
+ 		if (index++ >= top_index) {
+ 			// draw main item:
+ 			int column = 0;
+@@ -367,10 +366,7 @@
+ 			}
+ 
+ 			// draw subitems:
+-			ListIter<ListBoxCell> sub_iter = item->subitems;
+-			while (++sub_iter) {
+-				ListBoxCell* sub = sub_iter.value();
+-
++			for (auto sub = item->subitems.begin(); sub != item->subitems.end(); ++sub) {
+ 				column++;
+ 				item_rect.x += item_rect.w + 2;
+ 				item_rect.w = GetColumnWidth(column) - 2;
+@@ -418,20 +414,16 @@
+ void
+ ListBox::SizeColumns()
+ {
+-	ListBoxColumn* c = columns.first();
++	ListBoxColumn* c = &columns[0];
+ 
+ 	if (c->percent < 0.001) {
+ 		double total = 0;
+ 
+-		ListIter<ListBoxColumn> iter = columns;
+-		while (++iter) {
+-			c = iter.value();
++		for (auto c = columns.begin(); c != columns.end(); ++c) {
+ 			total += c->width;
+ 		}
+ 
+-		iter.reset();
+-		while (++iter) {
+-			c = iter.value();
++		for (auto c = columns.begin(); c != columns.end(); ++c) {
+ 			c->percent = c->width / total;
+ 		}
+ 	}
+@@ -446,8 +438,8 @@
+ 		usable_width -= 3;
+ 	}
+ 
+-	for (int i = 0; i < columns.size(); i++) {
+-		c = columns[i];
++	for (size_t i = 0; i < columns.size(); i++) {
++		c = &columns[i];
+ 
+ 		if (i < columns.size() - 1)
+ 		c->width = (int) (c->percent * usable_width);
+@@ -460,94 +452,94 @@
+ 
+ // +--------------------------------------------------------------------+
+ 
+-int   ListBox::NumItems()
++size_t ListBox::NumItems()
+ {
+ 	return items.size();
+ }
+ 
+-int   ListBox::NumColumns()
++size_t ListBox::NumColumns()
+ {
+ 	return columns.size();
+ }
+ 
+-Text  ListBox::GetItemText(int index)
++Text  ListBox::GetItemText(size_t index)
+ {
+ 	if (index >= 0 && index < items.size())
+-	return items[index]->text;
++	return items[index].text;
+ 
+ 	return Text();
+ }
+ 
+-void  ListBox::SetItemText(int index, const char* text)
++void  ListBox::SetItemText(size_t index, const char* text)
+ {
+ 	if (index >= 0 && index < items.size()) {
+-		items[index]->text = text;
++		items[index].text = text;
+ 	}
+ }
+ 
+-DWORD ListBox::GetItemData(int index)
++DWORD ListBox::GetItemData(size_t index)
+ {
+ 	if (index >= 0 && index < items.size())
+-	return items[index]->data;
++	return items[index].data;
+ 
+ 	return 0;
+ }
+ 
+-void  ListBox::SetItemData(int index, DWORD data)
++void  ListBox::SetItemData(size_t index, DWORD data)
+ {
+ 	if (index >= 0 && index < items.size()) {
+-		items[index]->data = data;
++		items[index].data = data;
+ 	}
+ }
+ 
+-Bitmap* ListBox::GetItemImage(int index)
++Bitmap* ListBox::GetItemImage(size_t index)
+ {
+ 	if (index >= 0 && index < items.size())
+-	return items[index]->image;
++	return items[index].image;
+ 
+ 	return 0;
+ }
+ 
+-void    ListBox::SetItemImage(int index, Bitmap* img)
++void    ListBox::SetItemImage(size_t index, Bitmap* img)
+ {
+ 	if (index >= 0 && index < items.size()) {
+-		items[index]->image = img;
++		items[index].image = img;
+ 	}
+ }
+ 
+-Color ListBox::GetItemColor(int index)
++Color ListBox::GetItemColor(size_t index)
+ {
+ 	if (index >= 0 && index < items.size())
+-	return items[index]->color;
++	return items[index].color;
+ 
+ 	return Color::White;
+ }
+ 
+-void  ListBox::SetItemColor(int index, Color c)
++void  ListBox::SetItemColor(size_t index, Color c)
+ {
+ 	if (index >= 0 && index < items.size()) {
+-		items[index]->color = c;
++		items[index].color = c;
+ 	}
+ }
+ 
+-Text  ListBox::GetItemText(int index, int column)
++Text  ListBox::GetItemText(size_t index, size_t column)
+ {
+ 	if (column == 0) {
+ 		return GetItemText(index);
+ 	}
+ 
+ 	if (index >= 0 && index < items.size()) {
+-		ListBoxItem* item = items[index];
++		ListBoxItem* item = &items[index];
+ 
+ 		column--;
+ 		if (column >= 0 && column < item->subitems.size())
+-		return item->subitems[column]->text;
++		return item->subitems[column].text;
+ 	}
+ 
+ 	return Text();
+ }
+ 
+-void  ListBox::SetItemText(int index, int column, const char* text)
++void  ListBox::SetItemText(size_t index, size_t column, const char* text)
+ {
+ 	if (column == 0) {
+ 		SetItemText(index, text);
+@@ -555,39 +547,39 @@
+ 	}
+ 
+ 	if (index >= 0 && index < items.size()) {
+-		ListBoxItem* item = items[index];
++		ListBoxItem* item = &items[index];
+ 		
+ 		column--;
+ 		if (column >= 0 && column < columns.size()-1) {
+ 			while (column >= item->subitems.size()) {
+ 				ListBoxCell* cell = new(__FILE__,__LINE__) ListBoxCell;
+ 				if (cell)
+-				item->subitems.append(cell);
++					item->subitems.push_back(*cell);
+ 			}
+ 
+-			item->subitems[column]->text = text;
++			item->subitems[column].text = text;
+ 		}
+ 	}
+ }
+ 
+-DWORD ListBox::GetItemData(int index, int column)
++DWORD ListBox::GetItemData(size_t index, size_t column)
+ {
+ 	if (column == 0) {
+ 		return GetItemData(index);
+ 	}
+ 
+ 	if (index >= 0 && index < items.size()) {
+-		ListBoxItem* item = items[index];
++		ListBoxItem* item = &items[index];
+ 		
+ 		column--;
+ 		if (column >= 0 && column < item->subitems.size())
+-		return item->subitems[column]->data;
++		return item->subitems[column].data;
+ 	}
+ 
+ 	return 0;
+ }
+ 
+-void  ListBox::SetItemData(int index, int column, DWORD data)
++void  ListBox::SetItemData(size_t index, size_t column, DWORD data)
+ {
+ 	if (column == 0) {
+ 		SetItemData(index, data);
+@@ -595,39 +587,39 @@
+ 	}
+ 
+ 	if (index >= 0 && index < items.size()) {
+-		ListBoxItem* item = items[index];
++		ListBoxItem* item = &items[index];
+ 		
+ 		column--;
+ 		if (column >= 0 && column < columns.size()-1) {
+ 			while (column >= item->subitems.size()) {
+ 				ListBoxCell* cell = new(__FILE__,__LINE__) ListBoxCell;
+ 				if (cell)
+-				item->subitems.append(cell);
++					item->subitems.push_back(*cell);
+ 			}
+ 
+-			item->subitems[column]->data = data;
++			item->subitems[column].data = data;
+ 		}
+ 	}
+ }
+ 
+-Bitmap* ListBox::GetItemImage(int index, int column)
++Bitmap* ListBox::GetItemImage(size_t index, size_t column)
+ {
+ 	if (column == 0) {
+ 		return GetItemImage(index);
+ 	}
+ 
+ 	if (index >= 0 && index < items.size()) {
+-		ListBoxItem* item = items[index];
++		ListBoxItem* item = &items[index];
+ 		
+ 		column--;
+ 		if (column >= 0 && column < item->subitems.size())
+-		return item->subitems[column]->image;
++		return item->subitems[column].image;
+ 	}
+ 
+ 	return 0;
+ }
+ 
+-void  ListBox::SetItemImage(int index, int column, Bitmap* img)
++void  ListBox::SetItemImage(size_t index, size_t column, Bitmap* img)
+ {
+ 	if (column == 0) {
+ 		SetItemImage(index, img);
+@@ -635,17 +627,17 @@
+ 	}
+ 
+ 	if (index >= 0 && index < items.size()) {
+-		ListBoxItem* item = items[index];
++		ListBoxItem* item = &items[index];
+ 		
+ 		column--;
+ 		if (column >= 0 && column < columns.size()-1) {
+ 			while (column >= item->subitems.size()) {
+ 				ListBoxCell* cell = new(__FILE__,__LINE__) ListBoxCell;
+ 				if (cell)
+-				item->subitems.append(cell);
++					item->subitems.push_back(*cell);
+ 			}
+ 
+-			item->subitems[column]->image = img;
++			item->subitems[column].image = img;
+ 		}
+ 	}
+ }
+@@ -659,7 +651,7 @@
+ 		item->color   = fore_color;
+ 		item->listbox = this;
+ 
+-		items.append(item);
++		items.push_back(*item);
+ 
+ 		line_count = items.size();
+ 		list_index = items.size()-1;
+@@ -678,7 +670,7 @@
+ 		item->color   = fore_color;
+ 		item->listbox = this;
+ 
+-		items.append(item);
++		items.push_back(*item);
+ 
+ 		line_count = items.size();
+ 		list_index = items.size()-1;
+@@ -696,7 +688,7 @@
+ 		item->color   = fore_color;
+ 		item->listbox = this;
+ 
+-		items.append(item);
++		items.push_back(*item);
+ 
+ 		line_count = items.size();
+ 		list_index = items.size()-1;
+@@ -705,7 +697,7 @@
+ 	return list_index+1;
+ }
+ 
+-void  ListBox::InsertItem(int index, const char* text)
++void  ListBox::InsertItem(size_t index, const char* text)
+ {
+ 	if (index >=0 && index < items.size()) {
+ 		ListBoxItem* item = new(__FILE__,__LINE__) ListBoxItem;
+@@ -715,14 +707,14 @@
+ 			item->color   = fore_color;
+ 			item->listbox = this;
+ 
+-			list_index = index;
+-			items.insert(item, list_index);
++			auto lit = items.begin() + index;
++			items.insert(lit, *item);
+ 			line_count = items.size();
+ 		}
+ 	}
+ }
+ 
+-void  ListBox::InsertItemWithData(int index, const char* text, int data)
++void  ListBox::InsertItemWithData(size_t index, const char* text, int data)
+ {
+ 	if (index >=0 && index < items.size()) {
+ 		ListBoxItem* item = new(__FILE__,__LINE__) ListBoxItem;
+@@ -733,8 +725,8 @@
+ 			item->color   = fore_color;
+ 			item->listbox = this;
+ 
+-			list_index = index;
+-			items.insert(item, list_index);
++			auto lit = items.begin() + index;
++			items.insert(lit, *item);
+ 			line_count = items.size();
+ 		}
+ 	}
+@@ -742,19 +734,18 @@
+ 
+ void  ListBox::ClearItems()
+ {
+-	items.destroy();
++	items.clear();
+ 	selcount   = 0;
+ 	top_index  = 0;
+ 	list_index = 0;
+ 	line_count = 0;
+ }
+ 
+-void  ListBox::RemoveItem(int index)
++void  ListBox::RemoveItem(size_t index)
+ {
+ 	if (index >= 0 && index < items.size()) {
+-		if (items[index]->selected)
+-		selcount--;
+-		items.removeIndex(index);
++		auto item = items.begin() + index;
++		items.erase(item);
+ 		line_count = items.size();
+ 	}
+ }
+@@ -762,10 +753,9 @@
+ void  ListBox::RemoveSelectedItems()
+ {
+ 	if (selcount) {
+-		ListIter<ListBoxItem> item = items;
+-		while (++item) {
++		for (auto item = items.begin(); item != items.end(); ++item) {
+ 			if (item->selected) {
+-				delete item.removeItem();
++				items.erase(item);
+ 			}
+ 		}
+ 
+@@ -784,96 +774,96 @@
+ 		column->align = align;
+ 		column->sort  = sort;
+ 
+-		columns.append(column);
++		columns.push_back(*column);
+ 	}
+ }
+ 
+-Text  ListBox::GetColumnTitle(int index)
++Text  ListBox::GetColumnTitle(size_t index)
+ {
+ 	if (index >= 0 && index < columns.size())
+-	return columns[index]->title;
++	return columns[index].title;
+ 
+ 	return Text();
+ }
+ 
+-void  ListBox::SetColumnTitle(int index, const char* title)
++void  ListBox::SetColumnTitle(size_t index, const char* title)
+ {
+ 	if (index >= 0 && index < columns.size()) {
+-		columns[index]->title = title;
++		columns[index].title = title;
+ 	}
+ }
+ 
+-int   ListBox::GetColumnWidth(int index)
++int   ListBox::GetColumnWidth(size_t index)
+ {
+ 	if (index >= 0 && index < columns.size())
+-	return columns[index]->width;
++	return columns[index].width;
+ 
+ 	return 0;
+ }
+ 
+-void  ListBox::SetColumnWidth(int index, int width)
++void  ListBox::SetColumnWidth(size_t index, int width)
+ {
+ 	if (index >= 0 && index < columns.size()) {
+-		columns[index]->width = width;
++		columns[index].width = width;
+ 	}
+ }
+ 
+-int   ListBox::GetColumnAlign(int index)
++int   ListBox::GetColumnAlign(size_t index)
+ {
+ 	if (index >= 0 && index < columns.size())
+-	return columns[index]->align;
++	return columns[index].align;
+ 
+ 	return 0;
+ }
+ 
+-void  ListBox::SetColumnAlign(int index, int align)
++void  ListBox::SetColumnAlign(size_t index, int align)
+ {
+ 	if (index >= 0 && index < columns.size()) {
+-		columns[index]->align = align;
++		columns[index].align = align;
+ 	}
+ }
+ 
+-int   ListBox::GetColumnSort(int index)
++int   ListBox::GetColumnSort(size_t index)
+ {
+ 	if (index >= 0 && index < columns.size())
+-	return columns[index]->sort;
++	return columns[index].sort;
+ 
+ 	return 0;
+ }
+ 
+-void  ListBox::SetColumnSort(int index, int sort)
++void  ListBox::SetColumnSort(size_t index, int sort)
+ {
+ 	if (index >= 0 && index < columns.size()) {
+-		columns[index]->sort = sort;
++		columns[index].sort = sort;
+ 	}
+ }
+ 
+-Color ListBox::GetColumnColor(int index)
++Color ListBox::GetColumnColor(size_t index)
+ {
+ 	if (index >= 0 && index < columns.size())
+-	return columns[index]->color;
++	return columns[index].color;
+ 
+ 	return Color::White;
+ }
+ 
+-void  ListBox::SetColumnColor(int index, Color c)
++void  ListBox::SetColumnColor(size_t index, Color c)
+ {
+ 	if (index >= 0 && index < columns.size()) {
+-		columns[index]->color = c;
+-		columns[index]->use_color = true;
++		columns[index].color = c;
++		columns[index].use_color = true;
+ 	}
+ }
+ 
+-Color ListBox::GetItemColor(int index, int column)
++Color ListBox::GetItemColor(size_t index, size_t column)
+ {
+ 	Color c = Color::White;
+ 
+ 	if (index >= 0 && index < items.size())
+-	c = items[index]->color;
++	c = items[index].color;
+ 
+ 	if (column >= 0 && column < columns.size()) {
+-		if (columns[column]->use_color)
+-		c = columns[column]->color;
++		if (columns[column].use_color)
++		c = columns[column].color;
+ 	}
+ 
+ 	return c;
+@@ -940,22 +930,22 @@
+ 	}
+ }
+ 
+-bool  ListBox::IsSelected(int index)
++bool  ListBox::IsSelected(size_t index)
+ {
+ 	if (index >= 0 && index < items.size())
+-	return items[index]->selected;
++	return items[index].selected;
+ 
+ 	return false;
+ }
+ 
+-void  ListBox::SetSelected(int index, bool bNewValue)
++void  ListBox::SetSelected(size_t index, bool bNewValue)
+ {
+ 	if (index >= 0 && index < items.size()) {
+ 		if (!multiselect)
+ 		ClearSelection();
+ 
+-		if (items[index]->selected != bNewValue) {
+-			items[index]->selected = bNewValue;
++		if (items[index].selected != bNewValue) {
++			items[index].selected = bNewValue;
+ 
+ 			if (bNewValue) {
+ 				list_index = index;
+@@ -970,9 +960,9 @@
+ 
+ void  ListBox::ClearSelection()
+ {
+-	ListIter<ListBoxItem> item = items;
+-	while (++item)
+-	item->selected = false;
++	for (auto item = items.begin(); item != items.end(); ++item) {
++		item->selected = false;
++	}
+ 
+ 	selcount = 0;
+ }
+@@ -982,10 +972,9 @@
+ 	return list_index;
+ }
+ 
+-int   ListBox::GetLineCount()
++size_t ListBox::GetLineCount()
+ {
+-	line_count = items.size();
+-	return line_count;
++	return items.size();
+ }
+ 
+ int   ListBox::GetSelCount()
+@@ -995,9 +984,9 @@
+ 
+ int   ListBox::GetSelection()
+ {
+-	for (int i = 0; i < items.size(); i++)
+-	if (items[i]->selected)
+-	return i;
++	for (auto item = items.begin(); item != items.end(); ++item)
++		if (item->selected)
++			return item - items.begin();
+ 
+ 	return -1;
+ }
+@@ -1015,7 +1004,7 @@
+ 	return sort_column;
+ }
+ 
+-void  ListBox::SetSortColumn(int col_index)
++void  ListBox::SetSortColumn(size_t col_index)
+ {
+ 	if (col_index >= 0 && col_index <= columns.size())
+ 	sort_column = col_index;
+@@ -1036,7 +1025,7 @@
+ void  ListBox::SortItems()
+ {
+ 	if (sort_column >=0 && sort_column <= columns.size())
+-	items.sort();
++		std::sort(items.begin(), items.end());
+ }
+ 
+ // +--------------------------------------------------------------------+
+@@ -1127,7 +1116,7 @@
+ 
+ 			sort_column = column;
+ 
+-			int& sort_criteria = columns[sort_column]->sort;
++			int& sort_criteria = columns[sort_column].sort;
+ 
+ 			if (sort_criteria != LIST_SORT_NEVER) {
+ 				if (!sort_criteria)
+@@ -1258,13 +1247,13 @@
+ int ListBox::OnKeyDown(int vk, int flags)
+ {
+ 	if (selcount == 1 && list_index >= 0 && list_index < items.size()) {
+-		ListBoxItem* item = items[list_index];
++		ListBoxItem* item = &items[list_index];
+ 
+ 		if (vk == VK_DOWN) {
+ 			if (list_index < items.size() - 1) {
+ 				item->selected = false;
+ 				list_index++;
+-				item = items[list_index];
++				item = &items[list_index];
+ 				item->selected = true;
+ 				OnClick();
+ 				return ActiveWindow::OnKeyDown(vk, flags);
+@@ -1275,7 +1264,7 @@
+ 			if (list_index > 0) {
+ 				item->selected = false;
+ 				list_index--;
+-				item = items[list_index];
++				item = &items[list_index];
+ 				item->selected = true;
+ 				OnClick();
+ 				return ActiveWindow::OnKeyDown(vk, flags);
+@@ -1308,7 +1297,7 @@
+ 		if (max_col != drag_source->NumColumns())
+ 		max_col = 0;
+ 
+-		for (int i = 0; i < drag_source->NumItems(); i++) {
++		for (size_t i = 0; i < drag_source->NumItems(); i++) {
+ 			if (drag_source->IsSelected(i)) {
+ 				AddItemWithData(drag_source->GetItemText(i),
+ 				drag_source->GetItemData(i));
+@@ -1321,7 +1310,7 @@
+ 				if (!multiselect)
+ 				ClearSelection();
+ 
+-				items[list_index]->selected = true;
++				items[list_index].selected = true;
+ 				selcount++;
+ 			}
+ 		}
+Index: nGenEx/ListBox.h
+===================================================================
+--- nGenEx/ListBox.h	(revision 51)
++++ nGenEx/ListBox.h	(working copy)
+@@ -15,6 +15,7 @@
+ #ifndef ListBox_h
+ #define ListBox_h
+ 
++#include <vector>
+ #include "Types.h"
+ #include "ScrollWindow.h"
+ #include "List.h"
+@@ -71,32 +72,32 @@
+ 	virtual int       OnDragDrop(int x, int y, ActiveWindow* source);
+ 
+ 	// Property accessors:
+-	int            NumItems();
+-	int            NumColumns();
++	size_t            NumItems();
++	size_t            NumColumns();
+ 
+-	Text           GetItemText(int index);
+-	void           SetItemText(int index, const char* text);
+-	DWORD          GetItemData(int index);
+-	void           SetItemData(int index, DWORD data);
+-	Bitmap*        GetItemImage(int index);
+-	void           SetItemImage(int index, Bitmap* img);
+-	Color          GetItemColor(int index);
+-	void           SetItemColor(int index, Color c);
++	Text           GetItemText(size_t index);
++	void           SetItemText(size_t index, const char* text);
++	DWORD          GetItemData(size_t index);
++	void           SetItemData(size_t index, DWORD data);
++	Bitmap*        GetItemImage(size_t index);
++	void           SetItemImage(size_t index, Bitmap* img);
++	Color          GetItemColor(size_t index);
++	void           SetItemColor(size_t index, Color c);
+ 
+-	Text           GetItemText(int index, int column);
+-	void           SetItemText(int index, int column, const char* text);
+-	DWORD          GetItemData(int index, int column);
+-	void           SetItemData(int index, int column, DWORD data);
+-	Bitmap*        GetItemImage(int index, int column);
+-	void           SetItemImage(int index, int column, Bitmap* img);
++	Text           GetItemText(size_t index, size_t column);
++	void           SetItemText(size_t index, size_t column, const char* text);
++	DWORD          GetItemData(size_t index, size_t column);
++	void           SetItemData(size_t index, size_t column, DWORD data);
++	Bitmap*        GetItemImage(size_t index, size_t column);
++	void           SetItemImage(size_t index, size_t column, Bitmap* img);
+ 
+ 	int            AddItem(const char* text);
+ 	int            AddImage(Bitmap* img);
+ 	int            AddItemWithData(const char* text, int data);
+-	void           InsertItem(int index, const char* text);
+-	void           InsertItemWithData(int index, const char* text, int data);
++	void           InsertItem(size_t index, const char* text);
++	void           InsertItemWithData(size_t index, const char* text, int data);
+ 	void           ClearItems();
+-	void           RemoveItem(int index);
++	void           RemoveItem(size_t index);
+ 	void           RemoveSelectedItems();
+ 
+ 	void           AddColumn(const char* title,
+@@ -104,18 +105,18 @@
+ 	int align = ListBox::LIST_ALIGN_LEFT,
+ 	int sort  = ListBox::LIST_SORT_NONE);
+ 
+-	Text           GetColumnTitle(int index);
+-	void           SetColumnTitle(int index, const char* title);
+-	int            GetColumnWidth(int index);
+-	void           SetColumnWidth(int index, int width);
+-	int            GetColumnAlign(int index);
+-	void           SetColumnAlign(int index, int align);
+-	int            GetColumnSort(int index);
+-	void           SetColumnSort(int index, int sort);
+-	Color          GetColumnColor(int index);
+-	void           SetColumnColor(int index, Color c);
++	Text           GetColumnTitle(size_t index);
++	void           SetColumnTitle(size_t index, const char* title);
++	int            GetColumnWidth(size_t index);
++	void           SetColumnWidth(size_t index, int width);
++	int            GetColumnAlign(size_t index);
++	void           SetColumnAlign(size_t index, int align);
++	int            GetColumnSort(size_t index);
++	void           SetColumnSort(size_t index, int sort);
++	Color          GetColumnColor(size_t index);
++	void           SetColumnColor(size_t index, Color c);
+ 
+-	Color          GetItemColor(int index, int column);
++	Color          GetItemColor(size_t index, size_t column);
+ 
+ 	int            GetMultiSelect();
+ 	void           SetMultiSelect(int nNewValue);
+@@ -129,12 +130,12 @@
+ 	int            GetSelectedStyle() const;
+ 	void           SetSelectedStyle(int style);
+ 
+-	bool           IsSelected(int index);
+-	void           SetSelected(int index, bool bNewValue=true);
++	bool           IsSelected(size_t index);
++	void           SetSelected(size_t index, bool bNewValue=true);
+ 	void           ClearSelection();
+ 
+ 	int            GetSortColumn();
+-	void           SetSortColumn(int col_index);
++	void           SetSortColumn(size_t col_index);
+ 	int            GetSortCriteria();
+ 	void           SetSortCriteria(SORT sort);
+ 	void           SortItems();
+@@ -142,7 +143,7 @@
+ 
+ 	// read-only:
+ 	virtual int    GetListIndex();
+-	virtual int    GetLineCount();
++	virtual size_t GetLineCount();
+ 	virtual int    GetSelCount();
+ 	virtual int    GetSelection();
+ 	virtual Text   GetSelectedItem();
+@@ -151,17 +152,17 @@
+ 	int            IndexFromPoint(int x, int y) const;
+ 
+ 	// properties:
+-	List<ListBoxItem>    items;
+-	List<ListBoxColumn>  columns;
++	std::vector<ListBoxItem>    items;
++	std::vector<ListBoxColumn>  columns;
+ 
+ 	bool           show_headings;
+ 	int            multiselect;
+-	int            list_index;
+-	int            selcount;
++	size_t         list_index;
++	size_t         selcount;
+ 
+ 	Color          selected_color;
+ 
+-	int            sort_column;
++	size_t            sort_column;
+ 	int            item_style;
+ 	int            seln_style;
+ };
+Index: nGenEx/Locale_ss.cpp
+===================================================================
+--- nGenEx/Locale_ss.cpp	(revision 51)
++++ nGenEx/Locale_ss.cpp	(working copy)
+@@ -12,6 +12,7 @@
+ 	3D Locale (Polygon) Object
+ */
+ 
++#include <vector>
+ #include "MemDebug.h"
+ #include "Locale_ss.h"
+ 
+@@ -19,7 +20,7 @@
+ 
+ // +--------------------------------------------------------------------+
+ 
+-static List<Locale>   locales;
++static std::vector<Locale>   locales;
+ 
+ // +--------------------------------------------------------------------+
+ 
+@@ -53,14 +54,19 @@
+ 		}
+ 	}
+ 
+-	locales.append(this);
++	locales.push_back(*this);
+ }
+ 
+ // +--------------------------------------------------------------------+
+ 
+ Locale::~Locale()
+ {
+-	locales.remove(this);
++	for (auto l_it = locales.begin(); l_it != locales.end(); ++l_it) {
++		if (*l_it == *this) {
++			locales.erase(l_it);
++			return;
++		}
++	}
+ }
+ 
+ // +--------------------------------------------------------------------+
+@@ -124,24 +130,22 @@
+ Locale*
+ Locale::CreateLocale(const char* l, const char* c, const char* v)
+ {
+-	ListIter<Locale> iter = locales;
+-	while (++iter) {
+-		Locale* loc = iter.value();
+-		if (!_stricmp(l, loc->GetLanguage())) {
++	for (auto iter = locales.begin(); iter != locales.end(); ++iter) {
++		if (!_stricmp(l, iter->GetLanguage())) {
+ 			if (c && *c) {
+-				if (!_stricmp(c, loc->GetCountry())) {
++				if (!_stricmp(c, iter->GetCountry())) {
+ 					if (v && *v) {
+-						if (!_stricmp(v, loc->GetVariant())) {
+-							return loc;
++						if (!_stricmp(v, iter->GetVariant())) {
++							return &(*iter);
+ 						}
+ 					}
+ 					else {
+-						return loc;
++						return &(*iter);
+ 					}
+ 				}
+ 			}
+ 			else {
+-				return loc;
++				return &(*iter);
+ 			}
+ 		}
+ 	}
+@@ -161,7 +165,7 @@
+ 
+ // +--------------------------------------------------------------------+
+ 
+-const List<Locale>& 
++const std::vector<Locale>& 
+ Locale::GetAllLocales()
+ {
+ 	return locales;
+Index: nGenEx/Locale_ss.h
+===================================================================
+--- nGenEx/Locale_ss.h	(revision 51)
++++ nGenEx/Locale_ss.h	(working copy)
+@@ -15,6 +15,7 @@
+ #ifndef Locale_h
+ #define Locale_h
+ 
++#include <vector>
+ #include "List.h"
+ #include "Text.h"
+ 
+@@ -31,7 +32,7 @@
+ 	int operator == (const Locale& that) const;
+ 
+ 	// Operations:
+-	static const List<Locale>& GetAllLocales();
++	static const std::vector<Locale>& GetAllLocales();
+ 	static Locale*             ParseLocale(const char* str);
+ 
+ 	// Property accessors:
+Index: nGenEx/ScrollWindow.h
+===================================================================
+--- nGenEx/ScrollWindow.h	(revision 51)
++++ nGenEx/ScrollWindow.h	(working copy)
+@@ -95,7 +95,7 @@
+ 
+ 	// read-only:
+ 	virtual int    GetTopIndex();
+-	virtual int    GetLineCount();
++	virtual size_t GetLineCount();
+ 	virtual int    GetPageCount();
+ 	virtual int    GetPageSize();
+ 	virtual int    GetScrollTrack();
+@@ -121,7 +121,7 @@
+ 	int            line_count;
+ 	int            page_count;
+ 	int            page_size;
+-	int            top_index;
++	size_t         top_index;
+ 	int            line_height;
+ 
+ 	bool           smooth_scroll;
+Index: nGenEx/Solid.h
+===================================================================
+--- nGenEx/Solid.h	(revision 51)
++++ nGenEx/Solid.h	(working copy)
+@@ -15,6 +15,7 @@
+ #ifndef Solid_h
+ #define Solid_h
+ 
++#include <vector>
+ #include "Polygon.h"
+ #include "Graphic.h"
+ #include "Video.h"
+@@ -71,7 +72,7 @@
+ 	// stencil shadows
+ 	virtual void   CreateShadows(int nlights=1);
+ 	virtual void   UpdateShadows(List<Light>& lights);
+-	List<Shadow>&  GetShadows()         { return shadows;       }
++	std::vector<Shadow>&  GetShadows()         { return shadows;       }
+ 
+ 	bool           Load(const char* mag_file, double scale=1.0);
+ 	bool           Load(ModelFile*  loader,   double scale=1.0);
+@@ -98,7 +99,7 @@
+ 	Matrix         orientation;
+ 	Poly*          intersection_poly;
+ 
+-	List<Shadow>   shadows;
++	std::vector<Shadow>   shadows;
+ };
+ 
+ // +--------------------------------------------------------------------+
+@@ -135,8 +136,8 @@
+ 	bool           IsLuminous()   const { return luminous;         }
+ 	void           SetLuminous(bool l)  { luminous = l;            }
+ 
+-	List<Surface>&    GetSurfaces()     { return surfaces;         }
+-	List<Material>&   GetMaterials()    { return materials;        }
++	std::vector<Surface>&    GetSurfaces()     { return surfaces;         }
++	std::vector<Material>&   GetMaterials()    { return materials;        }
+ 	const Material*   FindMaterial(const char* mtl_name) const;
+ 	const Material*   ReplaceMaterial(const Material* mtl);
+ 	void              GetAllTextures(List<Bitmap>& textures);
+@@ -148,8 +149,8 @@
+ 	void           ScaleBy(double factor);
+ 
+ 	void           Normalize();
+-	void           SelectPolys(List<Poly>&, Material* mtl);
+-	void           SelectPolys(List<Poly>&, Vec3 loc);
++	void           SelectPolys(std::vector<Poly>&, Material* mtl);
++	void           SelectPolys(std::vector<Poly>&, Vec3 loc);
+ 
+ 	void           AddSurface(Surface* s);
+ 	void           ComputeTangents();
+@@ -162,8 +163,8 @@
+ 	bool           LoadMag6(BYTE* block, int len, double scale);
+ 
+ 	char           name[Solid::NAMELEN];
+-	List<Surface>  surfaces;
+-	List<Material> materials;
++	std::vector<Surface>  surfaces;
++	std::vector<Material> materials;
+ 	int            nverts;
+ 	int            npolys;
+ 	float          radius;
+@@ -199,7 +200,7 @@
+ 	bool           IsSimplified()    const { return state & SIMPLE ? true : false;       }
+ 
+ 	Model*         GetModel()        const { return model;         }
+-	List<Segment>& GetSegments()           { return segments;      }
++	std::vector<Segment>& GetSegments()           { return segments;      }
+ 	const Point&   GetOffset()       const { return offset;        }
+ 	const Matrix&  GetOrientation()  const { return orientation;   }
+ 	double         Radius()          const { return radius;        }
+@@ -247,7 +248,7 @@
+ 	int            nindices;
+ 	int            state;
+ 	Poly*          polys;
+-	List<Segment>  segments;
++	std::vector<Segment>  segments;
+ 
+ 	Point          offset;
+ 	Matrix         orientation;
+Index: nGenEx/VideoDX9.cpp
+===================================================================
+--- nGenEx/VideoDX9.cpp	(revision 51)
++++ nGenEx/VideoDX9.cpp	(working copy)
+@@ -1328,18 +1328,16 @@
+ }
+ 
+ bool
+-VideoDX9::SetLights(const List<Light>& lights)
++VideoDX9::SetLights(const std::vector<Light>& lights)
+ {
+ 	if (d3ddevice) {
+ 		main_light = 0;
+ 		back_light = 0;
+ 
+-		ListIter<Light> iter  = (List<Light>&) lights;
++		
+ 		int             index = -1;
+ 
+-		while (++iter) {
+-			Light* light = iter.value();
+-
++		for (auto light  = lights.begin(); light != lights.end(); ++light) {
+ 			if (light->IsActive()) {
+ 				D3DLIGHT9 d3d_light;
+ 				ZeroMemory(&d3d_light, sizeof(d3d_light));
+@@ -1359,10 +1357,10 @@
+ 
+ 					if (light->CastsShadow()) {
+ 						if (!main_light || light->Intensity() > main_light->Intensity())
+-						main_light = light;
++							main_light = const_cast<Light*>(&(*light));
+ 					}
+ 					else if (!back_light) {
+-						back_light = light;
++						back_light = const_cast<Light*>(&(*light));
+ 					}
+ 				}
+ 				else {
+@@ -2086,27 +2084,22 @@
+ 		matrixWorld = world_matrix;
+ 		D3DXMatrixInverse(&matrixWorldInverse, 0, &matrixWorld);
+ 
+-		ListIter<Surface> surf_iter = model->GetSurfaces();
+-		while (++surf_iter) {
+-			Surface* surf = surf_iter.value();
+-
++		for (auto surf = model->GetSurfaces().begin(); surf != model->GetSurfaces().end(); ++surf) {
+ 			if (surf->IsHidden() || surf->IsSimplified())
+ 			continue;
+ 
+-			if (PrepareSurface(surf)) {
++			if (PrepareSurface(&(*surf))) {
+ 				result = true;
+ 
+ 				VideoDX9SurfaceData* surf_data = (VideoDX9SurfaceData*) surf->GetVideoPrivateData();
+ 				surf_data->vertex_buffer->Select(0);
+ 				surf_data->index_buffer->Select();
+ 
+-				ListIter<Segment> seg_iter = surf->GetSegments();
+-				while (++seg_iter) {
+-					Segment*    segment  = seg_iter.value();
++				for (auto segment = surf->GetSegments().begin(); segment != surf->GetSegments().end(); ++segment) {
+ 					Material*   mtl      = segment->material;
+ 
+ 					if (mtl && (blend_modes & mtl->blend)) {
+-						result = result && DrawSegment(segment);
++						result = result && DrawSegment(&(*segment));
+ 					}
+ 				}
+ 			}
+@@ -3145,10 +3138,7 @@
+ 
+ 		int first_index = 0;
+ 
+-		ListIter<Segment> seg_iter = surf->GetSegments();
+-		while (++seg_iter) {
+-			Segment* segment = seg_iter.value();
+-
++		for (auto segment = surf->GetSegments().begin(); segment != surf->GetSegments().end(); ++segment) {
+ 			if (!segment->video_data) {
+ 				VideoDX9SegmentData* seg_data = new(__FILE__,__LINE__) VideoDX9SegmentData;
+ 
+Index: nGenEx/VideoDX9.h
+===================================================================
+--- nGenEx/VideoDX9.h	(revision 51)
++++ nGenEx/VideoDX9.h	(working copy)
+@@ -15,6 +15,7 @@
+ #ifndef VideoDX9_h
+ #define VideoDX9_h
+ 
++#include <vector>
+ #include "Video.h"
+ #include "VideoSettings.h"
+ #include "List.h"
+@@ -89,7 +90,7 @@
+ 	virtual bool   SetCamera(const Camera* cam);
+ 	virtual bool   SetEnvironment(Bitmap** faces);
+ 	virtual bool   SetAmbient(Color c);
+-	virtual bool   SetLights(const List<Light>& lights);
++	virtual bool   SetLights(const std::vector<Light>& lights);
+ 	virtual bool   SetProjection(float fov, 
+ 	float znear=1.0f, 
+ 	float zfar=1.0e6f, 
+Index: nGenEx/Window.h
+===================================================================
+--- nGenEx/Window.h	(revision 51)
++++ nGenEx/Window.h	(working copy)
+@@ -97,7 +97,7 @@
+ 	bool              shown;
+ 	Font*             font;
+ 
+-	List<View>        view_list;
++	std::vector<View*>        view_list;
+ };
+ 
+ #endif Window_h

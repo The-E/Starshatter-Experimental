@@ -26,7 +26,7 @@
 static DataLoader*   def_loader = 0;
 DataLoader*   DataLoader::loader = 0;
 
-static List<DataArchive>   archives;
+static std::vector<DataArchive>   archives;
 
 // +--------------------------------------------------------------------+
 
@@ -50,13 +50,13 @@ DataLoader::Initialize()
 	def_loader = new(__FILE__,__LINE__) DataLoader;
 	loader = def_loader;
 
-	archives.destroy();
+	archives.clear();
 }
 
 void
 DataLoader::Close()
 {
-	archives.destroy();
+	archives.clear();
 	Bitmap::ClearCache();
 
 	delete def_loader;
@@ -103,16 +103,15 @@ DataLoader::EnableDatafile(const char* name)
 			status = DATAFILE_OK;
 
 			bool found = false;
-			ListIter<DataArchive> iter = archives;
-			while (++iter && !found) {
-				DataArchive* archive = iter.value();
-				if (!strcmp(archive->Name(), name)) {
+			for (auto arit = archives.begin(); arit != archives.end() && !found; ++arit) {
+				if (!strcmp(arit->Name(), name)) {
 					found = true;
+					break;
 				}
 			}
 
 			if (!found)
-			archives.append(a);
+				archives.push_back(*a);
 		}
 		else {
 			Print("   WARNING: invalid data file '%s'\n", name);
@@ -134,11 +133,9 @@ DataLoader::EnableDatafile(const char* name)
 int
 DataLoader::DisableDatafile(const char* name)
 {
-	ListIter<DataArchive> iter = archives;
-	while (++iter) {
-		DataArchive* a = iter.value();
-		if (!strcmp(a->Name(), name)) {
-			delete iter.removeItem();
+	for (auto arit = archives.begin(); arit != archives.end(); ++arit) {
+		if (!strcmp(arit->Name(), name)) {
+			archives.erase(arit);
 			return DATAFILE_OK;
 		}
 	}
@@ -179,10 +176,8 @@ DataLoader::FindFile(const char* name)
 	}
 
 	// then check datafiles, from last to first:
-	int narchives = archives.size();
-	for (int i = 0; i < narchives; i++) {
-		DataArchive* a = archives[narchives-1-i];
-		if (a->FindEntry(filename) > -1) {
+	for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
+		if (arit->FindEntry(filename) > -1) {
 			return true;
 		}
 	}
@@ -193,35 +188,34 @@ DataLoader::FindFile(const char* name)
 // +--------------------------------------------------------------------+
 
 int
-DataLoader::ListFiles(const char* filter, List<Text>& list, bool recurse)
+DataLoader::ListFiles(const char* filter, std::vector<Text>& list, bool recurse)
 {
-	list.destroy();
+	list.clear();
 
 	ListFileSystem(filter, list, datapath, recurse);
 
 	// then check datafile(s):
 	int narchives = archives.size();
-	for (int i = 0; i < narchives; i++) {
-		DataArchive* a = archives[narchives-1-i];
-		ListArchiveFiles(a->Name(), filter, list);
+	for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
+		ListArchiveFiles(arit->Name(), filter, list);
 	}
 
 	return list.size();
 }
 
 int
-DataLoader::ListArchiveFiles(const char* archive_name, const char* filter, List<Text> &list)
+DataLoader::ListArchiveFiles(const char* archive_name, const char* filter, std::vector<Text> &list)
 {
 	int            pathlen  = datapath.length();
 	DataArchive*   a        = 0;
 
 	if (archive_name) {
 		int narchives = archives.size();
-		for (int i = 0; i < narchives && !a; i++) {
-			a = archives[narchives-1-i];
-
+		for (auto arit = archives.rbegin(); arit != archives.rend() && !a; ++arit) {
 			if (_stricmp(a->Name(), archive_name))
-			a = 0;
+				a = 0;
+			else
+				a = &(*arit);
 		}
 	}
 
@@ -240,8 +234,15 @@ DataLoader::ListArchiveFiles(const char* archive_name, const char* filter, List<
 			if (entry_name.contains(datapath)) {
 				Text fname = entry_name(pathlen, 1000);
 
-				if (!list.contains(&fname))
-				list.append(new Text(fname));
+				bool contains = false;
+				for (auto listit = list.begin(); listit != list.end(); ++listit) {
+					if (*listit == fname) {
+						contains = true;
+						break;
+					}
+				}
+				if (!contains)
+					list.push_back(fname);
 			}
 		}
 	}
@@ -267,8 +268,15 @@ DataLoader::ListArchiveFiles(const char* archive_name, const char* filter, List<
 			if (entry_name.contains(datapath) && entry_name.contains(data_filter)) {
 				Text fname = entry_name(pathlen, 1000);
 
-				if (!list.contains(&fname))
-				list.append(new Text(fname));
+				bool contains = false;
+				for (auto listit = list.begin(); listit != list.end(); ++listit) {
+					if (*listit == fname) {
+						contains = true;
+						break;
+					}
+				}
+				if (!contains)
+					list.push_back(fname);
 			}
 		}
 	}
@@ -279,7 +287,7 @@ DataLoader::ListArchiveFiles(const char* archive_name, const char* filter, List<
 // +--------------------------------------------------------------------+
 
 void
-DataLoader::ListFileSystem(const char* filter, List<Text>& list, Text base_path, bool recurse)
+DataLoader::ListFileSystem(const char* filter, std::vector<Text>& list, Text base_path, bool recurse)
 {
 	if (use_file_system) {
 		char data_filter[256];
@@ -330,7 +338,7 @@ DataLoader::ListFileSystem(const char* filter, List<Text>& list, Text base_path,
 						Text full_name = datapath;
 						full_name += data.cFileName;
 
-						list.append(new Text(full_name(pathlen, 1000)));
+						list.push_back(full_name(pathlen, 1000));
 					}
 				}
 			}
@@ -386,21 +394,19 @@ DataLoader::LoadBuffer(const char* name, BYTE*& buf, bool null_terminate, bool o
 	// vox files are usually in their own archive,
 	// so check there first
 	if (narchives > 1 && strstr(filename, "Vox")) {
-		for (int i = 0; i < narchives; i++) {
-			DataArchive* a = archives[narchives-1-i];
-			if (strstr(a->Name(), "vox")) {
-				int index = a->FindEntry(filename);
+		for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
+			if (strstr(arit->Name(), "vox")) {
+				int index = arit->FindEntry(filename);
 				if (index > -1)
-				return a->ExpandEntry(index, buf, null_terminate);
+					return arit->ExpandEntry(index, buf, null_terminate);
 			}
 		}
 	}
 
-	for (int i = 0; i < narchives; i++) {
-		DataArchive* a = archives[narchives-1-i];
-		int index = a->FindEntry(filename);
+	for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
+		int index = arit->FindEntry(filename);
 		if (index > -1)
-		return a->ExpandEntry(index, buf, null_terminate);
+		return arit->ExpandEntry(index, buf, null_terminate);
 	}
 
 	if (!optional)
@@ -599,12 +605,10 @@ DataLoader::LoadIndexed(const char* name, Bitmap& bitmap, int type)
 		int   len     = 0;
 		BYTE* tmp_buf = 0;
 
-		int narchives = archives.size();
-		for (int i = 0; i < narchives; i++) {
-			DataArchive* a = archives[narchives-1-i];
-			int index = a->FindEntry(filename);
+		for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
+			int index = arit->FindEntry(filename);
 			if (index > -1) {
-				len = a->ExpandEntry(index, tmp_buf);
+				len = arit->ExpandEntry(index, tmp_buf);
 
 				if (pcx_file)
 				pcx.LoadBuffer(tmp_buf, len);
@@ -695,12 +699,10 @@ DataLoader::LoadHiColor(const char* name, Bitmap& bitmap, int type)
 		int   len     = 0;
 		BYTE* tmp_buf = 0;
 
-		int narchives = archives.size();
-		for (int i = 0; i < narchives; i++) {
-			DataArchive* a = archives[narchives-1-i];
-			int index = a->FindEntry(filename);
+		for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
+			int index = arit->FindEntry(filename);
 			if (index > -1) {
-				len = a->ExpandEntry(index, tmp_buf);
+				len = arit->ExpandEntry(index, tmp_buf);
 
 				if (pcx_file)
 				pcx.LoadBuffer(tmp_buf, len);
@@ -778,12 +780,10 @@ DataLoader::LoadAlpha(const char* name, Bitmap& bitmap, int type)
 		int   len     = 0;
 		BYTE* tmp_buf = 0;
 
-		int narchives = archives.size();
-		for (int i = 0; i < narchives; i++) {
-			DataArchive* a = archives[narchives-1-i];
-			int index = a->FindEntry(filename);
+		for (auto arit = archives.rbegin(); arit != archives.rend(); ++arit) {
+			int index = arit->FindEntry(filename);
 			if (index > -1) {
-				len = a->ExpandEntry(index, tmp_buf);
+				len = arit->ExpandEntry(index, tmp_buf);
 
 				if (pcx_file)
 				pcx.LoadBuffer(tmp_buf, len);

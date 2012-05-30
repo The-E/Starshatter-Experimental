@@ -15,6 +15,7 @@
 #ifndef ListBox_h
 #define ListBox_h
 
+#include <vector>
 #include "Types.h"
 #include "ScrollWindow.h"
 #include "List.h"
@@ -71,32 +72,32 @@ public:
 	virtual int       OnDragDrop(int x, int y, ActiveWindow* source);
 
 	// Property accessors:
-	int            NumItems();
-	int            NumColumns();
+	size_t            NumItems();
+	size_t            NumColumns();
 
-	Text           GetItemText(int index);
-	void           SetItemText(int index, const char* text);
-	DWORD          GetItemData(int index);
-	void           SetItemData(int index, DWORD data);
-	Bitmap*        GetItemImage(int index);
-	void           SetItemImage(int index, Bitmap* img);
-	Color          GetItemColor(int index);
-	void           SetItemColor(int index, Color c);
+	Text           GetItemText(size_t index);
+	void           SetItemText(size_t index, const char* text);
+	DWORD          GetItemData(size_t index);
+	void           SetItemData(size_t index, DWORD data);
+	Bitmap*        GetItemImage(size_t index);
+	void           SetItemImage(size_t index, Bitmap* img);
+	Color          GetItemColor(size_t index);
+	void           SetItemColor(size_t index, Color c);
 
-	Text           GetItemText(int index, int column);
-	void           SetItemText(int index, int column, const char* text);
-	DWORD          GetItemData(int index, int column);
-	void           SetItemData(int index, int column, DWORD data);
-	Bitmap*        GetItemImage(int index, int column);
-	void           SetItemImage(int index, int column, Bitmap* img);
+	Text           GetItemText(size_t index, size_t column);
+	void           SetItemText(size_t index, size_t column, const char* text);
+	DWORD          GetItemData(size_t index, size_t column);
+	void           SetItemData(size_t index, size_t column, DWORD data);
+	Bitmap*        GetItemImage(size_t index, size_t column);
+	void           SetItemImage(size_t index, size_t column, Bitmap* img);
 
 	int            AddItem(const char* text);
 	int            AddImage(Bitmap* img);
 	int            AddItemWithData(const char* text, int data);
-	void           InsertItem(int index, const char* text);
-	void           InsertItemWithData(int index, const char* text, int data);
+	void           InsertItem(size_t index, const char* text);
+	void           InsertItemWithData(size_t index, const char* text, int data);
 	void           ClearItems();
-	void           RemoveItem(int index);
+	void           RemoveItem(size_t index);
 	void           RemoveSelectedItems();
 
 	void           AddColumn(const char* title,
@@ -104,18 +105,18 @@ public:
 	int align = ListBox::LIST_ALIGN_LEFT,
 	int sort  = ListBox::LIST_SORT_NONE);
 
-	Text           GetColumnTitle(int index);
-	void           SetColumnTitle(int index, const char* title);
-	int            GetColumnWidth(int index);
-	void           SetColumnWidth(int index, int width);
-	int            GetColumnAlign(int index);
-	void           SetColumnAlign(int index, int align);
-	int            GetColumnSort(int index);
-	void           SetColumnSort(int index, int sort);
-	Color          GetColumnColor(int index);
-	void           SetColumnColor(int index, Color c);
+	Text           GetColumnTitle(size_t index);
+	void           SetColumnTitle(size_t index, const char* title);
+	int            GetColumnWidth(size_t index);
+	void           SetColumnWidth(size_t index, int width);
+	int            GetColumnAlign(size_t index);
+	void           SetColumnAlign(size_t index, int align);
+	int            GetColumnSort(size_t index);
+	void           SetColumnSort(size_t index, int sort);
+	Color          GetColumnColor(size_t index);
+	void           SetColumnColor(size_t index, Color c);
 
-	Color          GetItemColor(int index, int column);
+	Color          GetItemColor(size_t index, size_t column);
 
 	int            GetMultiSelect();
 	void           SetMultiSelect(int nNewValue);
@@ -129,12 +130,12 @@ public:
 	int            GetSelectedStyle() const;
 	void           SetSelectedStyle(int style);
 
-	bool           IsSelected(int index);
-	void           SetSelected(int index, bool bNewValue=true);
+	bool           IsSelected(size_t index);
+	void           SetSelected(size_t index, bool bNewValue=true);
 	void           ClearSelection();
 
 	int            GetSortColumn();
-	void           SetSortColumn(int col_index);
+	void           SetSortColumn(size_t col_index);
 	int            GetSortCriteria();
 	void           SetSortCriteria(SORT sort);
 	void           SortItems();
@@ -142,7 +143,7 @@ public:
 
 	// read-only:
 	virtual int    GetListIndex();
-	virtual int    GetLineCount();
+	virtual size_t GetLineCount();
 	virtual int    GetSelCount();
 	virtual int    GetSelection();
 	virtual Text   GetSelectedItem();
@@ -151,17 +152,17 @@ protected:
 	int            IndexFromPoint(int x, int y) const;
 
 	// properties:
-	List<ListBoxItem>    items;
-	List<ListBoxColumn>  columns;
+	std::vector<ListBoxItem>    items;
+	std::vector<ListBoxColumn>  columns;
 
 	bool           show_headings;
 	int            multiselect;
-	int            list_index;
-	int            selcount;
+	size_t         list_index;
+	size_t         selcount;
 
 	Color          selected_color;
 
-	int            sort_column;
+	size_t            sort_column;
 	int            item_style;
 	int            seln_style;
 };

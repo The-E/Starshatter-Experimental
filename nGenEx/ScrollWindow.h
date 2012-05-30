@@ -95,7 +95,7 @@ public:
 
 	// read-only:
 	virtual int    GetTopIndex();
-	virtual int    GetLineCount();
+	virtual size_t GetLineCount();
 	virtual int    GetPageCount();
 	virtual int    GetPageSize();
 	virtual int    GetScrollTrack();
@@ -121,7 +121,7 @@ protected:
 	int            line_count;
 	int            page_count;
 	int            page_size;
-	int            top_index;
+	size_t         top_index;
 	int            line_height;
 
 	bool           smooth_scroll;

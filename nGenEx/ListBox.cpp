@@ -12,6 +12,8 @@
 	ListBox ActiveWindow class
 */
 
+#include <vector>
+#include <algorithm>
 #include "MemDebug.h"
 #include "ListBox.h"
 #include "Button.h"
@@ -44,7 +46,7 @@ public:
 	static const char* TYPENAME() { return "ListBoxItem"; }
 
 	ListBoxItem() : data(0), image(0), selected(false), listbox(0), color(Color::White) { }
-	~ListBoxItem() { subitems.destroy(); }
+	~ListBoxItem() { subitems.clear(); }
 
 	int operator < (const ListBoxItem& item) const;
 	int operator <=(const ListBoxItem& item) const;
@@ -55,7 +57,7 @@ public:
 	Bitmap*              image;
 	bool                 selected;
 	Color                color;
-	List<ListBoxCell>    subitems;
+	std::vector<ListBoxCell>    subitems;
 
 	ListBox*             listbox;
 };
@@ -83,7 +85,7 @@ public:
 
 int ListBoxItem::operator < (const ListBoxItem& item) const
 {
-	int sort_column   = listbox->GetSortColumn() - 1;
+	size_t sort_column   = listbox->GetSortColumn() - 1;
 	int sort_criteria = listbox->GetSortCriteria();
 
 	if (listbox && listbox == item.listbox) {
@@ -109,16 +111,16 @@ int ListBoxItem::operator < (const ListBoxItem& item) const
 
 			switch (sort_criteria) {
 			case ListBox::LIST_SORT_NUMERIC_DESCENDING:
-				return subitems[sort_column]->data > item.subitems[sort_column]->data;
+				return subitems[sort_column].data > item.subitems[sort_column].data;
 
 			case ListBox::LIST_SORT_ALPHA_DESCENDING:
-				return subitems[sort_column]->text > item.subitems[sort_column]->text;
+				return subitems[sort_column].text > item.subitems[sort_column].text;
 
 			case ListBox::LIST_SORT_ALPHA_ASCENDING:
-				return subitems[sort_column]->text < item.subitems[sort_column]->text;
+				return subitems[sort_column].text < item.subitems[sort_column].text;
 
 			case ListBox::LIST_SORT_NUMERIC_ASCENDING:
-				return subitems[sort_column]->data < item.subitems[sort_column]->data;
+				return subitems[sort_column].data < item.subitems[sort_column].data;
 			}
 		}
 	}
@@ -130,7 +132,7 @@ int ListBoxItem::operator < (const ListBoxItem& item) const
 
 int ListBoxItem::operator <=(const ListBoxItem& item) const
 {
-	int sort_column   = listbox->GetSortColumn() - 1;
+	size_t sort_column   = listbox->GetSortColumn() - 1;
 	int sort_criteria = listbox->GetSortCriteria();
 
 	if (listbox && listbox == item.listbox) {
@@ -156,16 +158,16 @@ int ListBoxItem::operator <=(const ListBoxItem& item) const
 
 			switch (sort_criteria) {
 			case ListBox::LIST_SORT_NUMERIC_DESCENDING:
-				return subitems[sort_column]->data >= item.subitems[sort_column]->data;
+				return subitems[sort_column].data >= item.subitems[sort_column].data;
 
 			case ListBox::LIST_SORT_ALPHA_DESCENDING:
-				return subitems[sort_column]->text >= item.subitems[sort_column]->text;
+				return subitems[sort_column].text >= item.subitems[sort_column].text;
 
 			case ListBox::LIST_SORT_ALPHA_ASCENDING:
-				return subitems[sort_column]->text <= item.subitems[sort_column]->text;
+				return subitems[sort_column].text <= item.subitems[sort_column].text;
 
 			case ListBox::LIST_SORT_NUMERIC_ASCENDING:
-				return subitems[sort_column]->data <= item.subitems[sort_column]->data;
+				return subitems[sort_column].data <= item.subitems[sort_column].data;
 			}
 		}
 	}
@@ -177,7 +179,7 @@ int ListBoxItem::operator <=(const ListBoxItem& item) const
 
 int ListBoxItem::operator == (const ListBoxItem& item) const
 {
-	int sort_column   = listbox->GetSortColumn() - 1;
+	size_t sort_column   = listbox->GetSortColumn() - 1;
 	int sort_criteria = listbox->GetSortCriteria();
 
 	if (listbox && listbox == item.listbox) {
@@ -203,16 +205,16 @@ int ListBoxItem::operator == (const ListBoxItem& item) const
 
 			switch (sort_criteria) {
 			case ListBox::LIST_SORT_NUMERIC_DESCENDING:
-				return subitems[sort_column]->data == item.subitems[sort_column]->data;
+				return subitems[sort_column].data == item.subitems[sort_column].data;
 
 			case ListBox::LIST_SORT_ALPHA_DESCENDING:
-				return subitems[sort_column]->text == item.subitems[sort_column]->text;
+				return subitems[sort_column].text == item.subitems[sort_column].text;
 
 			case ListBox::LIST_SORT_ALPHA_ASCENDING:
-				return subitems[sort_column]->text == item.subitems[sort_column]->text;
+				return subitems[sort_column].text == item.subitems[sort_column].text;
 
 			case ListBox::LIST_SORT_NUMERIC_ASCENDING:
-				return subitems[sort_column]->data == item.subitems[sort_column]->data;
+				return subitems[sort_column].data == item.subitems[sort_column].data;
 			}
 		}
 	}
@@ -266,8 +268,8 @@ ListBox::ListBox(Screen* s, int ax, int ay, int aw, int ah, DWORD aid)
 
 ListBox::~ListBox()
 {
-	items.destroy();
-	columns.destroy();
+	items.clear();
+	columns.clear();
 }
 
 // +--------------------------------------------------------------------+
@@ -316,12 +318,9 @@ ListBox::DrawContent(const Rect& ctrl_rect)
 		item_rect.h = line_height;
 	}
 
-	int index = 0;
-	ListIter<ListBoxItem> iter = items;
+	size_t index = 0;
 
-	while (++iter && item_rect.y < h) {
-		ListBoxItem* item = iter.value();
-
+	for (auto item = items.begin(); item != items.end(); ++item) {
 		if (index++ >= top_index) {
 			// draw main item:
 			int column = 0;
@@ -367,10 +366,7 @@ ListBox::DrawContent(const Rect& ctrl_rect)
 			}
 
 			// draw subitems:
-			ListIter<ListBoxCell> sub_iter = item->subitems;
-			while (++sub_iter) {
-				ListBoxCell* sub = sub_iter.value();
-
+			for (auto sub = item->subitems.begin(); sub != item->subitems.end(); ++sub) {
 				column++;
 				item_rect.x += item_rect.w + 2;
 				item_rect.w = GetColumnWidth(column) - 2;
@@ -418,20 +414,16 @@ ListBox::DrawContent(const Rect& ctrl_rect)
 void
 ListBox::SizeColumns()
 {
-	ListBoxColumn* c = columns.first();
+	ListBoxColumn* c = &columns[0];
 
 	if (c->percent < 0.001) {
 		double total = 0;
 
-		ListIter<ListBoxColumn> iter = columns;
-		while (++iter) {
-			c = iter.value();
+		for (auto c = columns.begin(); c != columns.end(); ++c) {
 			total += c->width;
 		}
 
-		iter.reset();
-		while (++iter) {
-			c = iter.value();
+		for (auto c = columns.begin(); c != columns.end(); ++c) {
 			c->percent = c->width / total;
 		}
 	}
@@ -446,8 +438,8 @@ ListBox::SizeColumns()
 		usable_width -= 3;
 	}
 
-	for (int i = 0; i < columns.size(); i++) {
-		c = columns[i];
+	for (size_t i = 0; i < columns.size(); i++) {
+		c = &columns[i];
 
 		if (i < columns.size() - 1)
 		c->width = (int) (c->percent * usable_width);
@@ -460,94 +452,94 @@ ListBox::SizeColumns()
 
 // +--------------------------------------------------------------------+
 
-int   ListBox::NumItems()
+size_t ListBox::NumItems()
 {
 	return items.size();
 }
 
-int   ListBox::NumColumns()
+size_t ListBox::NumColumns()
 {
 	return columns.size();
 }
 
-Text  ListBox::GetItemText(int index)
+Text  ListBox::GetItemText(size_t index)
 {
 	if (index >= 0 && index < items.size())
-	return items[index]->text;
+	return items[index].text;
 
 	return Text();
 }
 
-void  ListBox::SetItemText(int index, const char* text)
+void  ListBox::SetItemText(size_t index, const char* text)
 {
 	if (index >= 0 && index < items.size()) {
-		items[index]->text = text;
+		items[index].text = text;
 	}
 }
 
-DWORD ListBox::GetItemData(int index)
+DWORD ListBox::GetItemData(size_t index)
 {
 	if (index >= 0 && index < items.size())
-	return items[index]->data;
+	return items[index].data;
 
 	return 0;
 }
 
-void  ListBox::SetItemData(int index, DWORD data)
+void  ListBox::SetItemData(size_t index, DWORD data)
 {
 	if (index >= 0 && index < items.size()) {
-		items[index]->data = data;
+		items[index].data = data;
 	}
 }
 
-Bitmap* ListBox::GetItemImage(int index)
+Bitmap* ListBox::GetItemImage(size_t index)
 {
 	if (index >= 0 && index < items.size())
-	return items[index]->image;
+	return items[index].image;
 
 	return 0;
 }
 
-void    ListBox::SetItemImage(int index, Bitmap* img)
+void    ListBox::SetItemImage(size_t index, Bitmap* img)
 {
 	if (index >= 0 && index < items.size()) {
-		items[index]->image = img;
+		items[index].image = img;
 	}
 }
 
-Color ListBox::GetItemColor(int index)
+Color ListBox::GetItemColor(size_t index)
 {
 	if (index >= 0 && index < items.size())
-	return items[index]->color;
+	return items[index].color;
 
 	return Color::White;
 }
 
-void  ListBox::SetItemColor(int index, Color c)
+void  ListBox::SetItemColor(size_t index, Color c)
 {
 	if (index >= 0 && index < items.size()) {
-		items[index]->color = c;
+		items[index].color = c;
 	}
 }
 
-Text  ListBox::GetItemText(int index, int column)
+Text  ListBox::GetItemText(size_t index, size_t column)
 {
 	if (column == 0) {
 		return GetItemText(index);
 	}
 
 	if (index >= 0 && index < items.size()) {
-		ListBoxItem* item = items[index];
+		ListBoxItem* item = &items[index];
 
 		column--;
 		if (column >= 0 && column < item->subitems.size())
-		return item->subitems[column]->text;
+		return item->subitems[column].text;
 	}
 
 	return Text();
 }
 
-void  ListBox::SetItemText(int index, int column, const char* text)
+void  ListBox::SetItemText(size_t index, size_t column, const char* text)
 {
 	if (column == 0) {
 		SetItemText(index, text);
@@ -555,39 +547,39 @@ void  ListBox::SetItemText(int index, int column, const char* text)
 	}
 
 	if (index >= 0 && index < items.size()) {
-		ListBoxItem* item = items[index];
+		ListBoxItem* item = &items[index];
 		
 		column--;
 		if (column >= 0 && column < columns.size()-1) {
 			while (column >= item->subitems.size()) {
 				ListBoxCell* cell = new(__FILE__,__LINE__) ListBoxCell;
 				if (cell)
-				item->subitems.append(cell);
+					item->subitems.push_back(*cell);
 			}
 
-			item->subitems[column]->text = text;
+			item->subitems[column].text = text;
 		}
 	}
 }
 
-DWORD ListBox::GetItemData(int index, int column)
+DWORD ListBox::GetItemData(size_t index, size_t column)
 {
 	if (column == 0) {
 		return GetItemData(index);
 	}
 
 	if (index >= 0 && index < items.size()) {
-		ListBoxItem* item = items[index];
+		ListBoxItem* item = &items[index];
 		
 		column--;
 		if (column >= 0 && column < item->subitems.size())
-		return item->subitems[column]->data;
+		return item->subitems[column].data;
 	}
 
 	return 0;
 }
 
-void  ListBox::SetItemData(int index, int column, DWORD data)
+void  ListBox::SetItemData(size_t index, size_t column, DWORD data)
 {
 	if (column == 0) {
 		SetItemData(index, data);
@@ -595,39 +587,39 @@ void  ListBox::SetItemData(int index, int column, DWORD data)
 	}
 
 	if (index >= 0 && index < items.size()) {
-		ListBoxItem* item = items[index];
+		ListBoxItem* item = &items[index];
 		
 		column--;
 		if (column >= 0 && column < columns.size()-1) {
 			while (column >= item->subitems.size()) {
 				ListBoxCell* cell = new(__FILE__,__LINE__) ListBoxCell;
 				if (cell)
-				item->subitems.append(cell);
+					item->subitems.push_back(*cell);
 			}
 
-			item->subitems[column]->data = data;
+			item->subitems[column].data = data;
 		}
 	}
 }
 
-Bitmap* ListBox::GetItemImage(int index, int column)
+Bitmap* ListBox::GetItemImage(size_t index, size_t column)
 {
 	if (column == 0) {
 		return GetItemImage(index);
 	}
 
 	if (index >= 0 && index < items.size()) {
-		ListBoxItem* item = items[index];
+		ListBoxItem* item = &items[index];
 		
 		column--;
 		if (column >= 0 && column < item->subitems.size())
-		return item->subitems[column]->image;
+		return item->subitems[column].image;
 	}
 
 	return 0;
 }
 
-void  ListBox::SetItemImage(int index, int column, Bitmap* img)
+void  ListBox::SetItemImage(size_t index, size_t column, Bitmap* img)
 {
 	if (column == 0) {
 		SetItemImage(index, img);
@@ -635,17 +627,17 @@ void  ListBox::SetItemImage(int index, int column, Bitmap* img)
 	}
 
 	if (index >= 0 && index < items.size()) {
-		ListBoxItem* item = items[index];
+		ListBoxItem* item = &items[index];
 		
 		column--;
 		if (column >= 0 && column < columns.size()-1) {
 			while (column >= item->subitems.size()) {
 				ListBoxCell* cell = new(__FILE__,__LINE__) ListBoxCell;
 				if (cell)
-				item->subitems.append(cell);
+					item->subitems.push_back(*cell);
 			}
 
-			item->subitems[column]->image = img;
+			item->subitems[column].image = img;
 		}
 	}
 }
@@ -659,7 +651,7 @@ int   ListBox::AddItem(const char* text)
 		item->color   = fore_color;
 		item->listbox = this;
 
-		items.append(item);
+		items.push_back(*item);
 
 		line_count = items.size();
 		list_index = items.size()-1;
@@ -678,7 +670,7 @@ int   ListBox::AddItemWithData(const char* text, int data)
 		item->color   = fore_color;
 		item->listbox = this;
 
-		items.append(item);
+		items.push_back(*item);
 
 		line_count = items.size();
 		list_index = items.size()-1;
@@ -696,7 +688,7 @@ int   ListBox::AddImage(Bitmap* img)
 		item->color   = fore_color;
 		item->listbox = this;
 
-		items.append(item);
+		items.push_back(*item);
 
 		line_count = items.size();
 		list_index = items.size()-1;
@@ -705,7 +697,7 @@ int   ListBox::AddImage(Bitmap* img)
 	return list_index+1;
 }
 
-void  ListBox::InsertItem(int index, const char* text)
+void  ListBox::InsertItem(size_t index, const char* text)
 {
 	if (index >=0 && index < items.size()) {
 		ListBoxItem* item = new(__FILE__,__LINE__) ListBoxItem;
@@ -715,14 +707,14 @@ void  ListBox::InsertItem(int index, const char* text)
 			item->color   = fore_color;
 			item->listbox = this;
 
-			list_index = index;
-			items.insert(item, list_index);
+			auto lit = items.begin() + index;
+			items.insert(lit, *item);
 			line_count = items.size();
 		}
 	}
 }
 
-void  ListBox::InsertItemWithData(int index, const char* text, int data)
+void  ListBox::InsertItemWithData(size_t index, const char* text, int data)
 {
 	if (index >=0 && index < items.size()) {
 		ListBoxItem* item = new(__FILE__,__LINE__) ListBoxItem;
@@ -733,8 +725,8 @@ void  ListBox::InsertItemWithData(int index, const char* text, int data)
 			item->color   = fore_color;
 			item->listbox = this;
 
-			list_index = index;
-			items.insert(item, list_index);
+			auto lit = items.begin() + index;
+			items.insert(lit, *item);
 			line_count = items.size();
 		}
 	}
@@ -742,19 +734,18 @@ void  ListBox::InsertItemWithData(int index, const char* text, int data)
 
 void  ListBox::ClearItems()
 {
-	items.destroy();
+	items.clear();
 	selcount   = 0;
 	top_index  = 0;
 	list_index = 0;
 	line_count = 0;
 }
 
-void  ListBox::RemoveItem(int index)
+void  ListBox::RemoveItem(size_t index)
 {
 	if (index >= 0 && index < items.size()) {
-		if (items[index]->selected)
-		selcount--;
-		items.removeIndex(index);
+		auto item = items.begin() + index;
+		items.erase(item);
 		line_count = items.size();
 	}
 }
@@ -762,10 +753,9 @@ void  ListBox::RemoveItem(int index)
 void  ListBox::RemoveSelectedItems()
 {
 	if (selcount) {
-		ListIter<ListBoxItem> item = items;
-		while (++item) {
+		for (auto item = items.begin(); item != items.end(); ++item) {
 			if (item->selected) {
-				delete item.removeItem();
+				items.erase(item);
 			}
 		}
 
@@ -784,96 +774,96 @@ void  ListBox::AddColumn(const char* title, int width, int align, int sort)
 		column->align = align;
 		column->sort  = sort;
 
-		columns.append(column);
+		columns.push_back(*column);
 	}
 }
 
-Text  ListBox::GetColumnTitle(int index)
+Text  ListBox::GetColumnTitle(size_t index)
 {
 	if (index >= 0 && index < columns.size())
-	return columns[index]->title;
+	return columns[index].title;
 
 	return Text();
 }
 
-void  ListBox::SetColumnTitle(int index, const char* title)
+void  ListBox::SetColumnTitle(size_t index, const char* title)
 {
 	if (index >= 0 && index < columns.size()) {
-		columns[index]->title = title;
+		columns[index].title = title;
 	}
 }
 
-int   ListBox::GetColumnWidth(int index)
+int   ListBox::GetColumnWidth(size_t index)
 {
 	if (index >= 0 && index < columns.size())
-	return columns[index]->width;
+	return columns[index].width;
 
 	return 0;
 }
 
-void  ListBox::SetColumnWidth(int index, int width)
+void  ListBox::SetColumnWidth(size_t index, int width)
 {
 	if (index >= 0 && index < columns.size()) {
-		columns[index]->width = width;
+		columns[index].width = width;
 	}
 }
 
-int   ListBox::GetColumnAlign(int index)
+int   ListBox::GetColumnAlign(size_t index)
 {
 	if (index >= 0 && index < columns.size())
-	return columns[index]->align;
+	return columns[index].align;
 
 	return 0;
 }
 
-void  ListBox::SetColumnAlign(int index, int align)
+void  ListBox::SetColumnAlign(size_t index, int align)
 {
 	if (index >= 0 && index < columns.size()) {
-		columns[index]->align = align;
+		columns[index].align = align;
 	}
 }
 
-int   ListBox::GetColumnSort(int index)
+int   ListBox::GetColumnSort(size_t index)
 {
 	if (index >= 0 && index < columns.size())
-	return columns[index]->sort;
+	return columns[index].sort;
 
 	return 0;
 }
 
-void  ListBox::SetColumnSort(int index, int sort)
+void  ListBox::SetColumnSort(size_t index, int sort)
 {
 	if (index >= 0 && index < columns.size()) {
-		columns[index]->sort = sort;
+		columns[index].sort = sort;
 	}
 }
 
-Color ListBox::GetColumnColor(int index)
+Color ListBox::GetColumnColor(size_t index)
 {
 	if (index >= 0 && index < columns.size())
-	return columns[index]->color;
+	return columns[index].color;
 
 	return Color::White;
 }
 
-void  ListBox::SetColumnColor(int index, Color c)
+void  ListBox::SetColumnColor(size_t index, Color c)
 {
 	if (index >= 0 && index < columns.size()) {
-		columns[index]->color = c;
-		columns[index]->use_color = true;
+		columns[index].color = c;
+		columns[index].use_color = true;
 	}
 }
 
-Color ListBox::GetItemColor(int index, int column)
+Color ListBox::GetItemColor(size_t index, size_t column)
 {
 	Color c = Color::White;
 
 	if (index >= 0 && index < items.size())
-	c = items[index]->color;
+	c = items[index].color;
 
 	if (column >= 0 && column < columns.size()) {
-		if (columns[column]->use_color)
-		c = columns[column]->color;
+		if (columns[column].use_color)
+		c = columns[column].color;
 	}
 
 	return c;
@@ -940,22 +930,22 @@ void  ListBox::SetSelectedStyle(int style)
 	}
 }
 
-bool  ListBox::IsSelected(int index)
+bool  ListBox::IsSelected(size_t index)
 {
 	if (index >= 0 && index < items.size())
-	return items[index]->selected;
+	return items[index].selected;
 
 	return false;
 }
 
-void  ListBox::SetSelected(int index, bool bNewValue)
+void  ListBox::SetSelected(size_t index, bool bNewValue)
 {
 	if (index >= 0 && index < items.size()) {
 		if (!multiselect)
 		ClearSelection();
 
-		if (items[index]->selected != bNewValue) {
-			items[index]->selected = bNewValue;
+		if (items[index].selected != bNewValue) {
+			items[index].selected = bNewValue;
 
 			if (bNewValue) {
 				list_index = index;
@@ -970,9 +960,9 @@ void  ListBox::SetSelected(int index, bool bNewValue)
 
 void  ListBox::ClearSelection()
 {
-	ListIter<ListBoxItem> item = items;
-	while (++item)
-	item->selected = false;
+	for (auto item = items.begin(); item != items.end(); ++item) {
+		item->selected = false;
+	}
 
 	selcount = 0;
 }
@@ -982,10 +972,9 @@ int   ListBox::GetListIndex()
 	return list_index;
 }
 
-int   ListBox::GetLineCount()
+size_t ListBox::GetLineCount()
 {
-	line_count = items.size();
-	return line_count;
+	return items.size();
 }
 
 int   ListBox::GetSelCount()
@@ -995,9 +984,9 @@ int   ListBox::GetSelCount()
 
 int   ListBox::GetSelection()
 {
-	for (int i = 0; i < items.size(); i++)
-	if (items[i]->selected)
-	return i;
+	for (auto item = items.begin(); item != items.end(); ++item)
+		if (item->selected)
+			return item - items.begin();
 
 	return -1;
 }
@@ -1015,7 +1004,7 @@ int   ListBox::GetSortColumn()
 	return sort_column;
 }
 
-void  ListBox::SetSortColumn(int col_index)
+void  ListBox::SetSortColumn(size_t col_index)
 {
 	if (col_index >= 0 && col_index <= columns.size())
 	sort_column = col_index;
@@ -1036,7 +1025,7 @@ void  ListBox::SetSortCriteria(SORT sort)
 void  ListBox::SortItems()
 {
 	if (sort_column >=0 && sort_column <= columns.size())
-	items.sort();
+		std::sort(items.begin(), items.end());
 }
 
 // +--------------------------------------------------------------------+
@@ -1127,7 +1116,7 @@ int ListBox::OnLButtonDown(int x, int y)
 
 			sort_column = column;
 
-			int& sort_criteria = columns[sort_column]->sort;
+			int& sort_criteria = columns[sort_column].sort;
 
 			if (sort_criteria != LIST_SORT_NEVER) {
 				if (!sort_criteria)
@@ -1258,13 +1247,13 @@ int ListBox::OnClick()
 int ListBox::OnKeyDown(int vk, int flags)
 {
 	if (selcount == 1 && list_index >= 0 && list_index < items.size()) {
-		ListBoxItem* item = items[list_index];
+		ListBoxItem* item = &items[list_index];
 
 		if (vk == VK_DOWN) {
 			if (list_index < items.size() - 1) {
 				item->selected = false;
 				list_index++;
-				item = items[list_index];
+				item = &items[list_index];
 				item->selected = true;
 				OnClick();
 				return ActiveWindow::OnKeyDown(vk, flags);
@@ -1275,7 +1264,7 @@ int ListBox::OnKeyDown(int vk, int flags)
 			if (list_index > 0) {
 				item->selected = false;
 				list_index--;
-				item = items[list_index];
+				item = &items[list_index];
 				item->selected = true;
 				OnClick();
 				return ActiveWindow::OnKeyDown(vk, flags);
@@ -1308,7 +1297,7 @@ int ListBox::OnDragDrop(int x, int y, ActiveWindow* source)
 		if (max_col != drag_source->NumColumns())
 		max_col = 0;
 
-		for (int i = 0; i < drag_source->NumItems(); i++) {
+		for (size_t i = 0; i < drag_source->NumItems(); i++) {
 			if (drag_source->IsSelected(i)) {
 				AddItemWithData(drag_source->GetItemText(i),
 				drag_source->GetItemData(i));
@@ -1321,7 +1310,7 @@ int ListBox::OnDragDrop(int x, int y, ActiveWindow* source)
 				if (!multiselect)
 				ClearSelection();
 
-				items[list_index]->selected = true;
+				items[list_index].selected = true;
 				selcount++;
 			}
 		}

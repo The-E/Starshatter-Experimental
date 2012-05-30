@@ -73,19 +73,17 @@ UVMapView::Refresh()
 
       window->DrawBitmap(x1, y1, x2, y2, bmp);
 
-      ListIter<Poly> iter = polys;
-      while (++iter) {
-         Poly*       p     = iter.value();
-         VertexSet*  vset  = p->vertex_set;
+      for (auto iter = polys.begin(); iter != polys.end(); ++iter) {
+         VertexSet*  vset  = iter->vertex_set;
 
-         if (p->material != material)
+         if (iter->material != material)
             continue;
 
-         for (int i = 0; i < p->nverts; i++) {
-            int    n1   = p->verts[i];
-            int    n2   = p->verts[0];
-            if (i < p->nverts-1)
-               n2 = p->verts[i+1];
+         for (int i = 0; i < iter->nverts; i++) {
+            int    n1   = iter->verts[i];
+            int    n2   = iter->verts[0];
+            if (i < iter->nverts-1)
+               n2 = iter->verts[i+1];
 
             double tu1  = vset->tu[n1];
             double tv1  = vset->tv[n1];
@@ -99,7 +97,7 @@ UVMapView::Refresh()
 
             window->DrawLine(x1,   y1,   x2,   y2,   Color::Yellow);
 
-            if (IsSelected(p, i))
+            if (IsSelected(&(*iter), i))
                window->FillRect(x1-3, y1-3, x1+3, y1+3, Color::Yellow);
             else
                window->DrawRect(x1-2, y1-2, x1+2, y1+2, Color::Yellow);
@@ -157,10 +155,10 @@ UVMapView::UseMaterial(Material* m)
 }
 
 void 
-UVMapView::UsePolys(List<Poly>& p)
+UVMapView::UsePolys(std::vector<Poly>& p)
 {
    polys.clear();
-   polys.append(p);
+   polys = p;
 }
 
 void
@@ -182,12 +180,12 @@ UVMapView::DragBy(double dx, double dy)
    float    du  = (float) (dx/w);
    float    dv  = (float) (dy/h);
 
-   for (int i = 0; i < selverts.size(); i++) {
-      DWORD value = selverts[i];
+   for (auto svi = selverts.begin(); svi != selverts.end(); ++svi) {
+      DWORD value = *svi;
       DWORD p     = value >> 16;
       DWORD n     = value & 0xffff;
 
-      Poly* poly = polys[p];
+      Poly* poly = &polys[p];
       if (poly && n < poly->nverts) {
          VertexSet*  vset = poly->vertex_set;
          int         v    = poly->verts[n];
@@ -245,9 +243,7 @@ UVMapView::End()
    // if only one mark:
    if (nmarks < 2) {
       // find all selected verts:
-      ListIter<Poly> iter = polys;
-      while (++iter) {
-         Poly*       p     = iter.value();
+	   for (auto p = polys.begin(); p != polys.end(); ++p) {
          VertexSet*  vset  = p->vertex_set;
 
          for (int i = 0; i < p->nverts; i++) {
@@ -262,14 +258,25 @@ UVMapView::End()
             int dy = abs(marks[0].y - y1);
 
             if (dx < 4 && dy < 4) {
-               WORD  p_index = iter.index();
+               WORD  p_index = p - polys.begin();
                DWORD value   = (p_index << 16) | i;
 
                if (select_mode == SELECT_REMOVE) {
-                  selverts.remove(value);
+				   for (auto svi = selverts.begin(); svi != selverts.end(); ++svi) {
+					   if (*svi == value) {
+						   selverts.erase(svi);
+					   }
+				   }
                }
-               else if (!selverts.contains(value)) {
-                  selverts.append(value);
+               else {
+				   bool contains = false;
+				   for (auto svi = selverts.begin(); svi != selverts.end(); ++svi) {
+					   if (*svi == value) {
+							contains = true;
+					   }
+				   }
+				   if (!contains)
+					   selverts.push_back(value);
                }
             }
          }
@@ -282,13 +289,11 @@ UVMapView::End()
       rgn.CreatePolygonRgn(marks, nmarks, WINDING);
 
       // find all selected verts:
-      ListIter<Poly> iter = polys;
-      while (++iter) {
-         Poly*       p     = iter.value();
-         VertexSet*  vset  = p->vertex_set;
+	  for (auto pi = polys.begin(); pi != polys.end(); ++pi) {
+         VertexSet*  vset  = pi->vertex_set;
 
-         for (int i = 0; i < p->nverts; i++) {
-            int    n1   = p->verts[i];
+         for (int i = 0; i < pi->nverts; i++) {
+            int    n1   = pi->verts[i];
             double tu1  = vset->tu[n1];
             double tv1  = vset->tv[n1];
 
@@ -298,14 +303,23 @@ UVMapView::End()
             CPoint p(x1,y1);
 
             if (rgn.PtInRegion(p)) {
-               WORD  p_index = iter.index();
+               WORD  p_index = pi - polys.begin();
                DWORD value   = (p_index << 16) | i;
 
                if (select_mode == SELECT_REMOVE) {
-                  selverts.remove(value);
+				   for (auto svi = selverts.begin(); svi != selverts.end(); ++svi) {
+					   if (*svi == value)
+						   selverts.erase(svi);
+				   }
                }
-               else if (!selverts.contains(value)) {
-                  selverts.append(value);
+               else {
+				   bool contains = false;
+				   for (auto svi = selverts.begin(); svi != selverts.end(); ++svi) {
+					   if (*svi == value)
+						   contains = true;
+				   }
+				   if (!contains)
+					   selverts.push_back(value);
                }
             }
          }
@@ -322,17 +336,14 @@ UVMapView::SelectAll()
 {
    selverts.clear();
 
-   ListIter<Poly> iter = polys;
-   while (++iter) {
-      Poly* p = iter.value();
-
+   for (auto p = polys.begin(); p != polys.end(); ++p) {
       if (p->material != material)
          continue;
 
       for (int i = 0; i < p->nverts; i++) {
-         WORD  p_index = iter.index();
+         WORD  p_index = p - polys.begin();
          DWORD value   = (p_index << 16) | i;
-         selverts.append(value);
+		 selverts.push_back(value);
       }
    }
 }
@@ -346,21 +357,25 @@ UVMapView::SelectNone()
 void
 UVMapView::SelectInverse()
 {
-   ListIter<Poly> iter = polys;
-   while (++iter) {
-      Poly* p = iter.value();
-
+   for (auto p = polys.begin(); p != polys.end(); ++p) {
       if (p->material != material)
          continue;
 
       for (int i = 0; i < p->nverts; i++) {
-         WORD  p_index = iter.index();
+         WORD  p_index = p - polys.begin();
          DWORD value   = (p_index << 16) | i;
 
-         if (selverts.contains(value))
-            selverts.remove(value);
+		 bool contains = false;
+		 auto svi = selverts.begin();
+		 for (; svi != selverts.end(); ++svi) {
+			 if (*svi == value) contains = true;
+			 break;
+		 }
+
+         if (contains)
+            selverts.erase(svi);
          else
-            selverts.append(value);
+			 selverts.push_back(value);
       }
    }
 }
@@ -368,10 +383,22 @@ UVMapView::SelectInverse()
 bool
 UVMapView::IsSelected(Poly* poly, WORD v)
 {
-   WORD p = polys.index(poly);
+	WORD p = -1;
+	for (auto pit = polys.begin(); pit != polys.end(); ++pit) {
+		if (*pit == *poly) {
+			p = pit - polys.begin();
+			break;
+		}
+	}
    DWORD value = (p << 16) | v;
 
-   return selverts.contains(value);
+   bool contains = false;
+	
+	for (auto svi = selverts.begin(); svi != selverts.end(); ++svi) {
+		return true;
+	}
+
+   return false;
 }
 
 bool
@@ -388,9 +415,7 @@ UVMapView::WillSelect(CPoint& p)
    double   cy  = window->Height() / 2 + y_offset;
 
    // find first selected vert:
-   ListIter<Poly> iter = polys;
-   while (++iter) {
-      Poly*       poly  = iter.value();
+   for (auto poly = polys.begin(); poly != polys.end(); ++poly) {
       VertexSet*  vset  = poly->vertex_set;
 
       for (int i = 0; i < poly->nverts; i++) {

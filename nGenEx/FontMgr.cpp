@@ -17,14 +17,14 @@
 
 // +--------------------------------------------------------------------+
 
-List<FontItem> FontMgr::fonts;
+std::vector<FontItem> FontMgr::fonts;
 
 // +--------------------------------------------------------------------+
 
 void
 FontMgr::Close()
 {
-	fonts.destroy();
+	fonts.clear();
 }
 
 // +--------------------------------------------------------------------+
@@ -39,7 +39,7 @@ FontMgr::Register(const char* name, Font* font)
 		item->size = 0;
 		item->font = font;
 
-		fonts.append(item);
+		fonts.push_back(*item);
 	}
 }
 
@@ -48,10 +48,9 @@ FontMgr::Register(const char* name, Font* font)
 Font*
 FontMgr::Find(const char* name)
 {
-	ListIter<FontItem> item = fonts;
-	while (++item) {
-		if (item->name == name)
-		return item->font;
+	for (auto fiter = fonts.begin(); fiter != fonts.end(); ++fiter) {
+		if (fiter->name == name)
+			return fiter->font;
 	}
 
 	return 0;

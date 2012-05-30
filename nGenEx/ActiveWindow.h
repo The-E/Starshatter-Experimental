@@ -15,13 +15,13 @@
 #ifndef ActiveWindow_h
 #define ActiveWindow_h
 
+#include <vector>
 #include "Types.h"
 #include "Color.h"
 #include "Geometry.h"
 #include "Bitmap.h"
 #include "Window.h"
 #include "EventTarget.h"
-#include "ArrayList.h"
 #include "List.h"
 #include "Text.h"
 
@@ -132,20 +132,20 @@ public:
 	virtual void      Show();
 	virtual void      Hide();
 	virtual void      MoveTo(const Rect& r);
-	virtual void      UseLayout(const ArrayList& min_x,
-	const ArrayList& min_y,
-	const FloatList& weight_x,
-	const FloatList& weight_y);
-	virtual void      UseLayout(const FloatList& min_x,
-	const FloatList& min_y,
-	const FloatList& weight_x,
-	const FloatList& weight_y);
+	virtual void      UseLayout(const std::vector<DWORD>& min_x,
+		const std::vector<DWORD>& min_y,
+		const std::vector<float>& weight_x,
+		const std::vector<float>& weight_y);
+	virtual void      UseLayout(const std::vector<float>& min_x,
+		const std::vector<float>& min_y,
+		const std::vector<float>& weight_x,
+		const std::vector<float>& weight_y);
 	virtual void      UseLayout(int     ncols,
-	int     nrows,
-	int*    min_x,
-	int*    min_y,
-	float*  weight_x,
-	float*  weight_y);
+		int     nrows,
+		int*    min_x,
+		int*    min_y,
+		float*  weight_x,
+		float*  weight_y);
 	virtual void      DoLayout();
 
 	// Event Target Interface:
@@ -205,7 +205,7 @@ public:
 	void              SetTextInsets(const Insets& t);
 	Insets&           GetTextInsets()         { return text_insets; }
 
-	List<ActiveWindow>& GetChildren()         { return children;    }
+	std::vector<ActiveWindow>& GetChildren()         { return children;    }
 	void              SetCellInsets(const Insets& c);
 	Insets&           GetCellInsets()         { return cell_insets; }
 	void              SetCells(int cx, int cy, int cw=1, int ch=1);
@@ -296,8 +296,8 @@ protected:
 	bool              topmost;
 
 	Layout*              layout;
-	List<ActiveWindow>   children;
-	List<AWMap>          clients;
+	std::vector<ActiveWindow>   children;
+	std::vector<AWMap>          clients;
 	AWEvent              event;
 
 	int               rows;

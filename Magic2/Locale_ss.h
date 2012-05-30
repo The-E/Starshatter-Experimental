@@ -15,6 +15,7 @@
 #ifndef Locale_h
 #define Locale_h
 
+#include <vector>
 #include "List.h"
 #include "Text.h"
 
@@ -31,7 +32,7 @@ public:
 	int operator == (const Locale& that) const;
 
 	// Operations:
-	static const List<Locale>& GetAllLocales();
+	static const std::vector<Locale>& GetAllLocales();
 	static Locale*             ParseLocale(const char* str);
 
 	// Property accessors:

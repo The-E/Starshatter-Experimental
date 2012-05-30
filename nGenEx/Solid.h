@@ -15,6 +15,7 @@
 #ifndef Solid_h
 #define Solid_h
 
+#include <vector>
 #include "Polygon.h"
 #include "Graphic.h"
 #include "Video.h"
@@ -71,7 +72,7 @@ public:
 	// stencil shadows
 	virtual void   CreateShadows(int nlights=1);
 	virtual void   UpdateShadows(List<Light>& lights);
-	List<Shadow>&  GetShadows()         { return shadows;       }
+	std::vector<Shadow>&  GetShadows()         { return shadows;       }
 
 	bool           Load(const char* mag_file, double scale=1.0);
 	bool           Load(ModelFile*  loader,   double scale=1.0);
@@ -98,7 +99,7 @@ protected:
 	Matrix         orientation;
 	Poly*          intersection_poly;
 
-	List<Shadow>   shadows;
+	std::vector<Shadow>   shadows;
 };
 
 // +--------------------------------------------------------------------+
@@ -135,8 +136,8 @@ public:
 	bool           IsLuminous()   const { return luminous;         }
 	void           SetLuminous(bool l)  { luminous = l;            }
 
-	List<Surface>&    GetSurfaces()     { return surfaces;         }
-	List<Material>&   GetMaterials()    { return materials;        }
+	std::vector<Surface>&    GetSurfaces()     { return surfaces;         }
+	std::vector<Material>&   GetMaterials()    { return materials;        }
 	const Material*   FindMaterial(const char* mtl_name) const;
 	const Material*   ReplaceMaterial(const Material* mtl);
 	void              GetAllTextures(List<Bitmap>& textures);
@@ -148,8 +149,8 @@ public:
 	void           ScaleBy(double factor);
 
 	void           Normalize();
-	void           SelectPolys(List<Poly>&, Material* mtl);
-	void           SelectPolys(List<Poly>&, Vec3 loc);
+	void           SelectPolys(std::vector<Poly>&, Material* mtl);
+	void           SelectPolys(std::vector<Poly>&, Vec3 loc);
 
 	void           AddSurface(Surface* s);
 	void           ComputeTangents();
@@ -162,8 +163,8 @@ private:
 	bool           LoadMag6(BYTE* block, int len, double scale);
 
 	char           name[Solid::NAMELEN];
-	List<Surface>  surfaces;
-	List<Material> materials;
+	std::vector<Surface>  surfaces;
+	std::vector<Material> materials;
 	int            nverts;
 	int            npolys;
 	float          radius;
@@ -199,7 +200,7 @@ public:
 	bool           IsSimplified()    const { return state & SIMPLE ? true : false;       }
 
 	Model*         GetModel()        const { return model;         }
-	List<Segment>& GetSegments()           { return segments;      }
+	std::vector<Segment>& GetSegments()           { return segments;      }
 	const Point&   GetOffset()       const { return offset;        }
 	const Matrix&  GetOrientation()  const { return orientation;   }
 	double         Radius()          const { return radius;        }
@@ -247,7 +248,7 @@ private:
 	int            nindices;
 	int            state;
 	Poly*          polys;
-	List<Segment>  segments;
+	std::vector<Segment>  segments;
 
 	Point          offset;
 	Matrix         orientation;

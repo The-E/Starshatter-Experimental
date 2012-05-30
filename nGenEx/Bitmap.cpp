@@ -12,6 +12,7 @@
 	Bitmap Resource class
 */
 
+#include <vector>
 #include "MemDebug.h"
 #include "Bitmap.h"
 #include "Video.h"
@@ -830,14 +831,14 @@ Bitmap::Default()
 
 // +--------------------------------------------------------------------+
 
-static List<Bitmap>  bitmap_cache;
+static std::vector<Bitmap>  bitmap_cache;
 
 Bitmap*
 Bitmap::GetBitmapByID(HANDLE bmp_id)
 {
-	for (int i = 0; i < bitmap_cache.size(); i++) {
-		if (bitmap_cache[i]->Handle() == bmp_id) {
-			return bitmap_cache[i];
+	for (auto bmi = bitmap_cache.begin(); bmi != bitmap_cache.end(); ++bmi) {
+		if (bmi->Handle() == bmp_id) {
+			return &(*bmi);
 		}
 	}
 
@@ -847,9 +848,9 @@ Bitmap::GetBitmapByID(HANDLE bmp_id)
 Bitmap*
 Bitmap::CheckCache(const char* filename)
 {
-	for (int i = 0; i < bitmap_cache.size(); i++) {
-		if (!_stricmp(bitmap_cache[i]->GetFilename(), filename)) {
-			return bitmap_cache[i];
+	for (auto bmi = bitmap_cache.begin(); bmi != bitmap_cache.end(); ++bmi) {
+		if (!_stricmp(bmi->GetFilename(), filename)) {
+			return &(*bmi);
 		}
 	}
 
@@ -859,24 +860,22 @@ Bitmap::CheckCache(const char* filename)
 void
 Bitmap::AddToCache(Bitmap* bmp)
 {
-	bitmap_cache.append(bmp);
+	bitmap_cache.push_back(*bmp);
 }
 
 void
 Bitmap::CacheUpdate()
 {
-	for (int i = 0; i < bitmap_cache.size(); i++) {
-		Bitmap* bmp = bitmap_cache[i];
-
-		if (bmp->IsTexture())
-		bmp->MakeTexture();
+	for (auto bmi = bitmap_cache.begin(); bmi != bitmap_cache.end(); ++bmi) {
+		if (bmi->IsTexture())
+			bmi->MakeTexture();
 	}
 }
 
 void
 Bitmap::ClearCache()
 {
-	bitmap_cache.destroy();
+	bitmap_cache.clear();
 }
 
 DWORD
@@ -885,14 +884,12 @@ Bitmap::CacheMemoryFootprint()
 	DWORD result = sizeof(bitmap_cache);
 	result += bitmap_cache.size() * sizeof(Bitmap*);
 
-	for (int i = 0; i < bitmap_cache.size(); i++) {
-		Bitmap* bmp = bitmap_cache[i];
+	for (auto bmi = bitmap_cache.begin(); bmi != bitmap_cache.end(); ++bmi) {
+		if (bmi->pix)
+		result += bmi->mapsize * sizeof(ColorIndex);
 
-		if (bmp->pix)
-		result += bmp->mapsize * sizeof(ColorIndex);
-
-		if (bmp->hipix)
-		result += bmp->mapsize * sizeof(Color);
+		if (bmi->hipix)
+		result += bmi->mapsize * sizeof(Color);
 	}
 
 	return result;

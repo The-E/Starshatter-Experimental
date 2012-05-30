@@ -22,6 +22,7 @@
 
 // +--------------------------------------------------------------------+
 
+#include <vector>
 #include "List.h"
 
 // +--------------------------------------------------------------------+
@@ -92,8 +93,8 @@ protected:
    Selector*      selector;
    Editor*        editor;
 
-   List<Command>  commands;
-   int            nundo;
+   std::vector<Command>  commands;
+   size_t         nundo;
 
 // Generated message map functions
 protected:

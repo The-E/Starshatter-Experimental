@@ -80,7 +80,7 @@ static float project_v_cylindrical(Vec3& v, int axis)
 }
 
 void
-Editor::ApplyMaterial(Material* material, List<Poly>& polys,
+Editor::ApplyMaterial(Material* material, std::vector<Poly>& polys,
                     int mapping, int axis, float scale_u, float scale_v,
                     int flip, int mirror, int rotate)
 {
@@ -99,20 +99,19 @@ Editor::ApplyMaterial(Material* material, List<Poly>& polys,
       return;
    }
 
-   VertexSet*  vset = polys.first()->vertex_set;
+   VertexSet*  vset = polys.begin()->vertex_set;
 
    Vec3*    loc   = vset->loc;
    float    min_u = 100000.0f, max_u = -100000.0f;
    float    min_v = 100000.0f, max_v = -100000.0f;
 
-   ListIter<Poly> iter = polys;
+   auto iter = polys.begin();
 
    // compute range and scale:
    if (mapping == MAP_PLANAR) {
-      while (++iter) {
-         Poly* poly = iter.value();
-         for (int i = 0; i < poly->nverts; i++) {
-            int v = poly->verts[i];
+      while (iter != polys.end()) {
+         for (int i = 0; i < iter->nverts; i++) {
+            int v = iter->verts[i];
             
             float u0 = project_u(loc[v], axis);
             float v0 = project_v(loc[v], axis);
@@ -122,6 +121,7 @@ Editor::ApplyMaterial(Material* material, List<Poly>& polys,
             if (u0 > max_u) max_u = u0;
             if (v0 > max_v) max_v = v0;
          }
+		 ++iter;
       }
    }
 
@@ -131,19 +131,17 @@ Editor::ApplyMaterial(Material* material, List<Poly>& polys,
    if (max_u != min_u) base_u = 1.0f / (max_u - min_u);
    if (max_v != min_v) base_v = 1.0f / (max_v - min_v);
 
-   iter.reset();
+   iter = polys.begin();
 
    // assign texture id and coordinates:
-   while (++iter) {
-      Poly* poly = iter.value();
-      
-      poly->material = material;
+   while (iter != polys.end()) {
+      iter->material = material;
 
       if (mapping == MAP_NONE)
          continue;
 
-      for (int i = 0; i < poly->nverts; i++) {
-         int v = poly->verts[i];
+      for (int i = 0; i < iter->nverts; i++) {
+         int v = iter->verts[i];
 
          // planar projection
          if (mapping == MAP_PLANAR) {
@@ -200,29 +198,29 @@ Editor::ApplyMaterial(Material* material, List<Poly>& polys,
             }
          }
       }
+	  ++iter;
    }
 
    Resegment();
 }
 
 void
-Editor::ApplyMaterialCylindrical(Material* material, List<Poly>& polys,
+Editor::ApplyMaterialCylindrical(Material* material, std::vector<Poly>& polys,
                     int axis, float scale_u, float scale_v,
                     int flip, int mirror, int rotate)
 {
-   VertexSet*  vset = polys.first()->vertex_set;
+   VertexSet*  vset = polys.begin()->vertex_set;
 
    Vec3*    loc   = vset->loc;
    float    min_u = 100000.0f, max_u = -100000.0f;
    float    min_v = 100000.0f, max_v = -100000.0f;
 
-   ListIter<Poly> iter = polys;
+   auto iter = polys.begin();
 
    // compute range and scale:
-   while (++iter) {
-      Poly* poly = iter.value();
-      for (int i = 0; i < poly->nverts; i++) {
-         int v = poly->verts[i];
+   while (iter != polys.end()) {
+      for (int i = 0; i < iter->nverts; i++) {
+         int v = iter->verts[i];
          
          float u0 = project_u_cylindrical(loc[v], axis);
          float v0 = project_v_cylindrical(loc[v], axis);
@@ -232,6 +230,7 @@ Editor::ApplyMaterialCylindrical(Material* material, List<Poly>& polys,
          if (u0 > max_u) max_u = u0;
          if (v0 > max_v) max_v = v0;
       }
+	  ++iter;
    }
 
    float base_u = 0.0f;
@@ -240,16 +239,14 @@ Editor::ApplyMaterialCylindrical(Material* material, List<Poly>& polys,
    if (max_u != min_u) base_u = 1.0f / (max_u - min_u);
    if (max_v != min_v) base_v = 1.0f / (max_v - min_v);
 
-   iter.reset();
+   iter = polys.begin();
 
    // assign texture id and coordinates:
-   while (++iter) {
-      Poly* poly = iter.value();
+   while (iter != polys.end()) {
+      iter->material = material;
       
-      poly->material = material;
-      
-      for (int i = 0; i < poly->nverts; i++) {
-         int   v  = poly->verts[i];
+      for (int i = 0; i < iter->nverts; i++) {
+         int   v  = iter->verts[i];
          float u0 = project_u_cylindrical(loc[v], axis);
          float v0 = project_v_cylindrical(loc[v], axis);
 
@@ -276,13 +273,14 @@ Editor::ApplyMaterialCylindrical(Material* material, List<Poly>& polys,
                vset->tu[v] = (v0 - min_v) * scale_v * base_v;
          }
       }
+	  ++iter;
    }
 
    Resegment();
 }
 
 void
-Editor::ApplyMaterialSpherical(Material* material, List<Poly>& polys,
+Editor::ApplyMaterialSpherical(Material* material, std::vector<Poly>& polys,
                     int axis, float scale_u, float scale_v,
                     int flip, int mirror, int rotate)
 {
@@ -308,25 +306,27 @@ void
 Editor::Resegment()
 {
    if (model) {
-      ListIter<Surface> iter = model->GetSurfaces();
-      while (++iter) {
-         Surface* surface = iter.value();
-         Poly*    polys   = surface->GetPolys();
-         int      npolys  = surface->NumPolys();
+      for (auto iter = model->GetSurfaces().begin(); iter != model->GetSurfaces().end(); ++iter) {
+         Poly*    polys   = iter->GetPolys();
+         int      npolys  = iter->NumPolys();
 
          for (int n = 0; n < npolys; n++) {
             Poly*     p = polys + n;
             Material* m = p->material;
-            int sortval = model->GetMaterials().index(m) + 1;
+			int sortval = 0;
+			for (auto mat_iter = model->GetMaterials().begin(); mat_iter != model->GetMaterials().end(); ++mat_iter) {
+				if (*m == *mat_iter)
+					sortval = (mat_iter - model->GetMaterials().begin()) + 1;
+			}
 
             if (p->sortval != sortval)
                p->sortval = sortval;
          }
 
          // destroy the old segments and video data:
-         VideoPrivateData* video_data = surface->GetVideoPrivateData();
-         surface->SetVideoPrivateData(0);
-         surface->GetSegments().destroy();
+         VideoPrivateData* video_data = iter->GetVideoPrivateData();
+         iter->SetVideoPrivateData(0);
+         iter->GetSegments().clear();
 
          delete video_data;
 
@@ -351,7 +351,7 @@ Editor::Resegment()
                segment->polys    = polys + n;
                segment->material = segment->polys->material;
 
-               surface->GetSegments().append(segment);
+			   iter->GetSegments().push_back(*segment);
             }
          }
       }

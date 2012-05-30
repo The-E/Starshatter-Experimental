@@ -1328,18 +1328,16 @@ VideoDX9::SetAmbient(Color c)
 }
 
 bool
-VideoDX9::SetLights(const List<Light>& lights)
+VideoDX9::SetLights(const std::vector<Light>& lights)
 {
 	if (d3ddevice) {
 		main_light = 0;
 		back_light = 0;
 
-		ListIter<Light> iter  = (List<Light>&) lights;
+		
 		int             index = -1;
 
-		while (++iter) {
-			Light* light = iter.value();
-
+		for (auto light  = lights.begin(); light != lights.end(); ++light) {
 			if (light->IsActive()) {
 				D3DLIGHT9 d3d_light;
 				ZeroMemory(&d3d_light, sizeof(d3d_light));
@@ -1359,10 +1357,10 @@ VideoDX9::SetLights(const List<Light>& lights)
 
 					if (light->CastsShadow()) {
 						if (!main_light || light->Intensity() > main_light->Intensity())
-						main_light = light;
+							main_light = const_cast<Light*>(&(*light));
 					}
 					else if (!back_light) {
-						back_light = light;
+						back_light = const_cast<Light*>(&(*light));
 					}
 				}
 				else {
@@ -2086,27 +2084,22 @@ VideoDX9::DrawSolid(Solid* s, DWORD blend_modes)
 		matrixWorld = world_matrix;
 		D3DXMatrixInverse(&matrixWorldInverse, 0, &matrixWorld);
 
-		ListIter<Surface> surf_iter = model->GetSurfaces();
-		while (++surf_iter) {
-			Surface* surf = surf_iter.value();
-
+		for (auto surf = model->GetSurfaces().begin(); surf != model->GetSurfaces().end(); ++surf) {
 			if (surf->IsHidden() || surf->IsSimplified())
 			continue;
 
-			if (PrepareSurface(surf)) {
+			if (PrepareSurface(&(*surf))) {
 				result = true;
 
 				VideoDX9SurfaceData* surf_data = (VideoDX9SurfaceData*) surf->GetVideoPrivateData();
 				surf_data->vertex_buffer->Select(0);
 				surf_data->index_buffer->Select();
 
-				ListIter<Segment> seg_iter = surf->GetSegments();
-				while (++seg_iter) {
-					Segment*    segment  = seg_iter.value();
+				for (auto segment = surf->GetSegments().begin(); segment != surf->GetSegments().end(); ++segment) {
 					Material*   mtl      = segment->material;
 
 					if (mtl && (blend_modes & mtl->blend)) {
-						result = result && DrawSegment(segment);
+						result = result && DrawSegment(&(*segment));
 					}
 				}
 			}
@@ -3145,10 +3138,7 @@ VideoDX9::PrepareSurface(Surface* surf)
 
 		int first_index = 0;
 
-		ListIter<Segment> seg_iter = surf->GetSegments();
-		while (++seg_iter) {
-			Segment* segment = seg_iter.value();
-
+		for (auto segment = surf->GetSegments().begin(); segment != surf->GetSegments().end(); ++segment) {
 			if (!segment->video_data) {
 				VideoDX9SegmentData* seg_data = new(__FILE__,__LINE__) VideoDX9SegmentData;
 

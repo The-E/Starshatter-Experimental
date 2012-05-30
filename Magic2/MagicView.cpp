@@ -853,7 +853,7 @@ void MagicView::OnTextureMap()
       Material*   mtl      = 0;
 
       if (dlg.mMaterialIndex >= 0) {
-         mtl = solid->GetModel()->GetMaterials()[dlg.mMaterialIndex];
+         mtl = &solid->GetModel()->GetMaterials()[dlg.mMaterialIndex];
       }
 
       editor->UseModel(solid->GetModel());
@@ -901,7 +901,7 @@ void MagicView::OnModifyUVMap()
    SetupModelViews();
 
    if (seln && uvmap_view) {
-      Poly* p = seln->GetPolys().first();
+      auto p = seln->GetPolys().begin();
 
       if (p) {
          uvmap_view->UseMaterial(p->material);

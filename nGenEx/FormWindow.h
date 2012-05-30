@@ -60,7 +60,7 @@ public:
 	virtual Slider*         CreateSlider(     const char* text, int x, int y, int w, int h, DWORD id=0, DWORD pid=0, DWORD style=0);
 
 	// property accessors:
-	ListIter<ActiveWindow>  Controls() { return children; }
+	std::vector<ActiveWindow> Controls() { return children; }
 
 protected:
 	virtual void            CreateDefLabel(CtrlDef& def);

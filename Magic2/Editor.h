@@ -42,15 +42,15 @@ public:
 
    enum { MAP_NONE, MAP_PLANAR, MAP_CYLINDRICAL, MAP_SPHERICAL, MAP_STRETCH };
 
-   void     ApplyMaterial(Material* material, List<Poly>& polys,
+   void     ApplyMaterial(Material* material, std::vector<Poly>& polys,
                     int mapping, int axis, float scale_u, float scale_v,
                     int flip, int mirror, int rotate);
 
-   void     ApplyMaterialCylindrical(Material* material, List<Poly>& polys,
+   void     ApplyMaterialCylindrical(Material* material, std::vector<Poly>& polys,
                     int axis, float scale_u, float scale_v,
                     int flip, int mirror, int rotate);
 
-   void     ApplyMaterialSpherical(Material* material, List<Poly>& polys,
+   void     ApplyMaterialSpherical(Material* material, std::vector<Poly>& polys,
                     int axis, float scale_u, float scale_v,
                     int flip, int mirror, int rotate);
 

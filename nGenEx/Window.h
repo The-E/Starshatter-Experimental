@@ -97,7 +97,7 @@ protected:
 	bool              shown;
 	Font*             font;
 
-	List<View>        view_list;
+	std::vector<View*>        view_list;
 };
 
 #endif Window_h

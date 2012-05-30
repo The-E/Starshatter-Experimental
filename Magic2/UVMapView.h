@@ -16,10 +16,10 @@
 #ifndef UVMapView_h
 #define UVMapView_h
 
+#include <vector>
 #include "View.h"
 #include "Polygon.h"
 #include "List.h"
-#include "ArrayList.h"
 
 // +--------------------------------------------------------------------+
 
@@ -38,7 +38,7 @@ public:
    virtual void Refresh();
 
    void        UseMaterial(Material* m);
-   void        UsePolys(List<Poly>& p);
+   void        UsePolys(std::vector<Poly>& p);
 
    void        MoveBy(double dx, double dy);
    void        DragBy(double dx, double dy);
@@ -62,7 +62,7 @@ protected:
    enum { MAX_MARK = 4096 };
 
    Material*   material;
-   List<Poly>  polys;
+   std::vector<Poly>  polys;
    Video*      video;
 
    double      zoom;
@@ -74,7 +74,7 @@ protected:
    int         select_mode;
    bool        active;
 
-   ArrayList   selverts;
+   std::vector<DWORD>   selverts;
 };
 
 // +--------------------------------------------------------------------+

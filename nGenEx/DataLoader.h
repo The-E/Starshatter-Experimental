@@ -11,6 +11,7 @@
 #ifndef DataLoader_h
 #define DataLoader_h
 
+#include <vector>
 #include "Types.h"
 #include "List.h"
 #include "Text.h"
@@ -51,8 +52,8 @@ public:
 	bool  IsMediaLoadEnabled()  const { return enable_media;   }
 
 	bool  FindFile(const char* fname);
-	int   ListFiles(const char* filter, List<Text>& list, bool recurse=false);
-	int   ListArchiveFiles(const char* archive, const char* filter, List<Text>& list);
+	int   ListFiles(const char* filter, std::vector<Text>& list, bool recurse=false);
+	int   ListArchiveFiles(const char* archive, const char* filter, std::vector<Text>& list);
 	int   LoadBuffer(const char* name, BYTE*&  buf, bool null_terminate=false, bool optional=false);
 	int   LoadBitmap(const char* name, Bitmap& bmp, int type=0, bool optional=false);
 	int   CacheBitmap(const char* name, Bitmap*& bmp, int type=0, bool optional=false);
@@ -68,7 +69,7 @@ private:
 	int   LoadHiColor(const char* name, Bitmap& bmp, int type);
 	int   LoadAlpha(  const char* name, Bitmap& bmp, int type);
 
-	void  ListFileSystem(const char* filter, List<Text>& list, Text base_path, bool recurse);
+	void  ListFileSystem(const char* filter, std::vector<Text>& list, Text base_path, bool recurse);
 	int   LoadPartialFile(const char* fname, BYTE*& buf, int max_load, bool optional=false);
 	int   LoadOggStream(const char* fname, Sound*& snd);
 

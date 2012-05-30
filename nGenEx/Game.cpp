@@ -8,6 +8,7 @@
 
 */
 
+#include <vector>
 #include "MemDebug.h"
 #include "Game.h"
 #include "Mouse.h"
@@ -727,14 +728,12 @@ bool
 Game::InitContent()
 {
 	DataLoader* loader = DataLoader::GetLoader();
-	List<Text>  bundles;
+	std::vector<Text>  bundles;
 
 	loader->SetDataPath("Content/");
 	loader->ListFiles("content*", bundles);
 
-	ListIter<Text> iter = bundles;
-	while (++iter) {
-		Text* filename = iter.value();
+	for (auto filename = bundles.begin(); filename != bundles.end(); ++filename) {
 		int   n        = filename->indexOf('_');
 
 		if (n > 0) {
@@ -1111,12 +1110,11 @@ Game::ScreenCapture(const char* name)
 		bool use_file_sys = loader->IsFileSystemEnabled();
 		loader->UseFileSystem(true);
 		loader->SetDataPath(0);
-		List<Text> shot_list;
+		std::vector<Text> shot_list;
 		loader->ListFiles("*.PCX", shot_list);
 		loader->UseFileSystem(use_file_sys);
 
-		for (int i = 0; i < shot_list.size(); i++) {
-			Text* s = shot_list[i];
+		for (auto s = shot_list.begin(); s != shot_list.end(); ++s) {
 			int   n = 0;
 
 			sscanf_s(s->data()+1, "%d", &n);
@@ -1124,7 +1122,7 @@ Game::ScreenCapture(const char* name)
 			shot_num = n+1;
 		}
 
-		shot_list.destroy();
+		shot_list.clear();
 	}
 
 	if (name)
@@ -1160,12 +1158,11 @@ Game::AVICapture(const char* name)
 			bool use_file_sys = loader->IsFileSystemEnabled();
 			loader->UseFileSystem(true);
 			loader->SetDataPath(0);
-			List<Text> avi_list;
+			std::vector<Text> avi_list;
 			loader->ListFiles("*.avi", avi_list);
 			loader->UseFileSystem(use_file_sys);
 
-			for (int i = 0; i < avi_list.size(); i++) {
-				Text* s = avi_list[i];
+			for (auto s = avi_list.begin(); s != avi_list.end(); ++s) {
 				int   n = 0;
 
 				sscanf_s(s->data()+1, "%d", &n);
@@ -1173,7 +1170,7 @@ Game::AVICapture(const char* name)
 				avi_num = n+1;
 			}
 
-			avi_list.destroy();
+			avi_list.clear();
 		}
 
 		if (name)
